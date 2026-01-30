@@ -429,6 +429,17 @@ header h1 {
     transform: scale(1.1);
 }
 
+.matrix-header-clickable {
+    cursor: pointer;
+    transition: background-color 0.2s, transform 0.1s;
+    user-select: none;
+}
+
+.matrix-header-clickable:hover {
+    background-color: #2c5282 !important;
+    transform: scale(1.05);
+}
+
 /* Mind Map */
 .mindmap-container {
     background: white;

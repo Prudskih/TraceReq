@@ -338,6 +338,49 @@ async function viewRequirementDetail(requirementId) {
     }
 }
 
+// Показ описания требования
+function showRequirementDescription(requirementId) {
+    const requirement = allRequirements.find(r => r.id === requirementId);
+    if (!requirement) {
+        // Если требование не найдено в кэше, загружаем его
+        fetch(`${API_BASE}/requirements/${requirementId}`)
+            .then(response => response.json())
+            .then(req => {
+                showDescriptionModal(req);
+            })
+            .catch(error => {
+                console.error('Ошибка загрузки требования:', error);
+                alert('Ошибка загрузки требования');
+            });
+    } else {
+        showDescriptionModal(requirement);
+    }
+}
+
+// Показ модального окна с описанием
+function showDescriptionModal(requirement) {
+    const modal = document.getElementById('detailModal');
+    const title = document.getElementById('detailTitle');
+    const content = document.getElementById('detailContent');
+    
+    title.textContent = `Требование #${requirement.id}: ${requirement.title}`;
+    
+    content.innerHTML = `
+        <div class="detail-section">
+            <h3>Описание</h3>
+            <div class="detail-field">
+                <div style="padding: 15px; background: #f8f9fa; border-radius: 5px; white-space: pre-wrap;">${escapeHtml(requirement.description || 'Описание не указано')}</div>
+            </div>
+        </div>
+        <div class="form-actions">
+            <button class="btn btn-primary" onclick="viewRequirementDetail(${requirement.id}); document.getElementById('detailModal').style.display='block';">Показать полную информацию</button>
+            <button class="btn btn-secondary" onclick="document.getElementById('detailModal').style.display='none';">Закрыть</button>
+        </div>
+    `;
+    
+    modal.style.display = 'block';
+}
+
 // Отображение таблицы пересечений
 async function displayMatrix() {
     try {
@@ -347,6 +390,9 @@ async function displayMatrix() {
         const container = document.getElementById('matrixTable');
         const requirements = data.requirements;
         const matrix = data.matrix;
+        
+        // Обновляем allRequirements для доступа к описаниям
+        allRequirements = requirements;
         
         if (requirements.length === 0) {
             container.innerHTML = '<p style="text-align: center; color: #7f8c8d; padding: 40px;">Нет требований для отображения матрицы.</p>';
@@ -364,13 +410,13 @@ async function displayMatrix() {
         
         // Заголовки столбцов
         reqIds.forEach(reqId => {
-            html += `<th title="${escapeHtml(reqDict[reqId].title)}">#${reqId}</th>`;
+            html += `<th class="matrix-header-clickable" title="${escapeHtml(reqDict[reqId].title)} - Кликните для просмотра описания" onclick="showRequirementDescription(${reqId})" style="cursor: pointer;">#${reqId}</th>`;
         });
         html += '</tr></thead><tbody>';
         
         // Строки матрицы
         reqIds.forEach(sourceId => {
-            html += `<tr><th title="${escapeHtml(reqDict[sourceId].title)}">#${sourceId}</th>`;
+            html += `<tr><th class="matrix-header-clickable" title="${escapeHtml(reqDict[sourceId].title)} - Кликните для просмотра описания" onclick="showRequirementDescription(${sourceId})" style="cursor: pointer;">#${sourceId}</th>`;
             reqIds.forEach(targetId => {
                 let cellClass = 'matrix-cell';
                 let cellContent = '';
