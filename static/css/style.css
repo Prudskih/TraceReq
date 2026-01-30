@@ -232,6 +232,7 @@ header h1 {
 
 .requirement-info div {
     text-overflow: ellipsis;
+    overflow: hidden;
 }
 
 .requirement-links {
