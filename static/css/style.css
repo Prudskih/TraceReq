@@ -230,6 +230,10 @@ header h1 {
     text-overflow: ellipsis;
 }
 
+.requirement-info div {
+    text-overflow: ellipsis;
+}
+
 .requirement-links {
     margin-top: 10px;
     padding-top: 10px;
