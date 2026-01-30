@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Система трассировки требований</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Система трассировки требований</h1>
+            <div class="header-actions">
+                <button id="addRequirementBtn" class="btn btn-primary">Добавить требование</button>
+                <div class="view-switcher">
+                    <button id="gridViewBtn" class="btn btn-view active">Сетка</button>
+                    <button id="matrixViewBtn" class="btn btn-view">Таблица пересечений</button>
+                    <button id="mindMapViewBtn" class="btn btn-view">Mind Map</button>
+                </div>
+                <div class="export-actions">
+                    <button id="exportBtn" class="btn btn-secondary">Экспорт в Excel</button>
+                    <button id="exportMatrixBtn" class="btn btn-secondary">Экспорт матрицы</button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Представление сетки -->
+        <div id="gridView" class="view-container active">
+            <div class="grid-container">
+                <div id="requirementsGrid" class="requirements-grid">
+                    <!-- Сетка требований будет загружена через JavaScript -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Представление таблицы пересечений -->
+        <div id="matrixView" class="view-container">
+            <div class="matrix-container">
+                <div id="matrixTable" class="matrix-table-wrapper">
+                    <!-- Таблица пересечений будет загружена через JavaScript -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Представление Mind Map -->
+        <div id="mindMapView" class="view-container">
+            <div class="mindmap-container">
+                <div id="mindMapNetwork" class="mindmap-network"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно для создания/редактирования требования -->
+    <div id="requirementModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2 id="modalTitle">Добавить требование</h2>
+            <form id="requirementForm">
+                <input type="hidden" id="requirementId">
+                
+                <div class="form-group">
+                    <label for="title">Название *</label>
+                    <input type="text" id="title" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="description">Описание</label>
+                    <textarea id="description" rows="4"></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label for="requirementType">Тип требования *</label>
+                    <select id="requirementType" required>
+                        <option value="Бизнес-требование">Бизнес-требование</option>
+                        <option value="Функциональное требование">Функциональное требование</option>
+                        <option value="Нефункциональное требование">Нефункциональное требование</option>
+                        <option value="Пользовательское требование">Пользовательское требование</option>
+                        <option value="Требование к интерфейсу">Требование к интерфейсу</option>
+                    </select>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="status">Статус</label>
+                        <select id="status">
+                            <option value="Черновик">Черновик</option>
+                            <option value="В работе">В работе</option>
+                            <option value="На проверке">На проверке</option>
+                            <option value="Утверждено">Утверждено</option>
+                            <option value="Отклонено">Отклонено</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="priority">Приоритет</label>
+                        <select id="priority">
+                            <option value="Низкий">Низкий</option>
+                            <option value="Средний">Средний</option>
+                            <option value="Высокий">Высокий</option>
+                            <option value="Критический">Критический</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="source">Источник</label>
+                    <input type="text" id="source">
+                </div>
+                
+                <div class="form-group">
+                    <label for="author">Автор</label>
+                    <input type="text" id="author">
+                </div>
+                
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Сохранить</button>
+                    <button type="button" class="btn btn-secondary" id="cancelBtn">Отмена</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Модальное окно для связей -->
+    <div id="linkModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Добавить связь</h2>
+            <form id="linkForm">
+                <input type="hidden" id="sourceRequirementId">
+                
+                <div class="form-group">
+                    <label for="targetRequirementId">Целевое требование</label>
+                    <select id="targetRequirementId" required>
+                        <!-- Заполнится через JavaScript -->
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="linkType">Тип связи</label>
+                    <select id="linkType" required>
+                        <option value="Реализует">Реализует</option>
+                        <option value="Зависит от">Зависит от</option>
+                        <option value="Противоречит">Противоречит</option>
+                    </select>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Создать связь</button>
+                    <button type="button" class="btn btn-secondary" id="cancelLinkBtn">Отмена</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Модальное окно для детального просмотра требования -->
+    <div id="detailModal" class="modal">
+        <div class="modal-content modal-large">
+            <span class="close">&times;</span>
+            <h2 id="detailTitle">Детали требования</h2>
+            <div id="detailContent">
+                <!-- Содержимое будет загружено через JavaScript -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно для истории изменений -->
+    <div id="historyModal" class="modal">
+        <div class="modal-content modal-large">
+            <span class="close">&times;</span>
+            <h2>История изменений</h2>
+            <div id="historyContent">
+                <!-- История будет загружена через JavaScript -->
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
