@@ -34,8 +34,8 @@ def get_requirement_with_links(project_id,requirement_id):
                 .filter(Link.source_requirement_id == requirement_id))
                 .all())
     incoming = ((db.session.query(Link)
-                .join(Requirement, Link.sourse_requirement_id == Requirement.id)
-                .filter(Link.target_requirement_id == Requirement.id))
+                .join(Requirement, Link.source_requirement_id == Requirement.id)
+                .filter(Link.target_requirement_id == requirement_id))
                 .all())
 
     d = req.to_dict()
