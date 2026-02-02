@@ -6,7 +6,7 @@ from flask import Blueprint, request, jsonify, send_file
 
 from database import db
 from models.project import Project
-from models.requirement import RequirementType, RequirementStatus, Priority
+from models.requirement import Requirement, RequirementType, RequirementStatus, Priority
 from models.link import LinkType
 from services.export_service import ExportService
 
@@ -35,6 +35,34 @@ def create_project():
 def get_projects():
     projects =  Project.query.order_by(Project.id.asc()).all()
     return jsonify([project.to_dict() for project in projects])
+
+
+@api.route('/projects/<int:project_id>', methods=['PUT'])
+def update_project(project_id):
+    data = request.get_json() or {}
+    project = Project.query.get(project_id)
+    if not project:
+        return jsonify({'error': 'Project not found'}), 404
+
+    name = (data.get('name') or "").strip()
+    description = (data.get('description') or "").strip()
+
+    if name:
+        project.name = name
+    project.description = description
+    db.session.commit()
+    return jsonify(project.to_dict())
+
+
+@api.route('/projects/<int:project_id>', methods=['DELETE'])
+def delete_project(project_id):
+    project = Project.query.get(project_id)
+    if not project:
+        return jsonify({'error': 'Project not found'}), 404
+
+    db.session.delete(project)
+    db.session.commit()
+    return jsonify({'message': 'Project deleted successfully'})
 
 
 @api.route('/projects/<int:project_id>/requirements', methods=['GET'])
@@ -73,8 +101,8 @@ def create_requirement(project_id):
         return jsonify({'error': str(e)}), 400
 
 
-@api.route('/requirements/<int:requirement_id>', methods=['PUT'])
-def update_requirement(project_id,requirement_id):
+@api.route('/projects/<int:project_id>/requirements/<int:requirement_id>', methods=['PUT'])
+def update_requirement(project_id, requirement_id):
     """Обновление требования."""
     data = request.json or {}
 
@@ -104,7 +132,7 @@ def update_requirement(project_id,requirement_id):
         return jsonify({'error': str(e)}), 400
 
 
-@api.route('/requirements/<int:requirement_id>', methods=['DELETE'])
+@api.route('/projects/<int:project_id>/requirements/<int:requirement_id>', methods=['DELETE'])
 def delete_requirement(project_id, requirement_id):
     """Удаление требования."""
     data = request.get_json(silent=True) or {}
@@ -115,14 +143,17 @@ def delete_requirement(project_id, requirement_id):
     return jsonify({'error': 'Requirement not found'}), 404
 
 
-@api.route('/requirements/<int:requirement_id>/history', methods=['GET'])
-def get_requirement_history(requirement_id):
+@api.route('/projects/<int:project_id>/requirements/<int:requirement_id>/history', methods=['GET'])
+def get_requirement_history(project_id, requirement_id):
     """История изменения требования."""
+    req = db.session.get(Requirement, requirement_id)
+    if not req or req.project_id != project_id:
+        return jsonify({'error': 'Requirement not found'}), 404
     history = logic.get_history(requirement_id)
     return jsonify([h.to_dict() for h in history])
 
 
-@api.route('/links', methods=['POST'])
+@api.route('/projects/<int:project_id>/links', methods=['POST'])
 def create_link(project_id):
     """Создание связи между требованиями."""
     data = request.json or {}
@@ -150,14 +181,14 @@ def delete_link(link_id):
     return jsonify({'error': 'Link not found'}), 404
 
 
-@api.route('/matrix', methods=['GET'])
+@api.route('/projects/<int:project_id>/matrix', methods=['GET'])
 def get_requirements_matrix(project_id):
     """Матрица пересечений требований."""
     reqs, matrix, _links = logic.build_matrix(project_id)
     return jsonify({'requirements': [r.to_dict() for r in reqs], 'matrix': matrix})
 
 
-@api.route('/export', methods=['GET'])
+@api.route('/projects/<int:project_id>/export', methods=['GET'])
 def export_to_excel(project_id):
     """Экспорт требований и связей в Excel."""
     reqs, _matrix, links = logic.build_matrix(project_id)
@@ -177,7 +208,7 @@ def export_to_excel(project_id):
     )
 
 
-@api.route('/export/matrix', methods=['GET'])
+@api.route('/projects/<int:project_id>/export/matrix', methods=['GET'])
 def export_matrix_to_excel(project_id):
     """Экспорт матрицы пересечений в Excel."""
     reqs, _matrix, links = logic.build_matrix(project_id)
