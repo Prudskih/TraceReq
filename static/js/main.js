@@ -254,7 +254,7 @@ function getPriorityClass(priority) {
 // Просмотр деталей требования
 async function viewRequirementDetail(requirementId) {
     try {
-        const response = await fetch(`projectApi/requirements/${requirementId}`);
+        const response = await fetch(projectApi(`/requirements/${requirementId}`));
         const requirement = await response.json();
         
         const modal = document.getElementById('detailModal');
@@ -350,7 +350,7 @@ function showRequirementDescription(requirementId) {
     const requirement = allRequirements.find(r => r.id === requirementId);
     if (!requirement) {
         // Если требование не найдено в кэше, загружаем его
-        fetch(`projectApi/requirements/${requirementId}`)
+        fetch(projectApi(`/requirements/${requirementId}`))
             .then(response => response.json())
             .then(req => {
                 showDescriptionModal(req);
@@ -391,7 +391,7 @@ function showDescriptionModal(requirement) {
 // Отображение таблицы пересечений
 async function displayMatrix() {
     try {
-        const response = await fetch(`projectApi/matrix`);
+        const response = await fetch(projectApi('/matrix'));
         const data = await response.json();
         
         const container = document.getElementById('matrixTable');
@@ -570,7 +570,7 @@ function openRequirementModal(requirementId = null) {
 // Загрузка требования для редактирования
 async function loadRequirementForEdit(requirementId) {
     try {
-        const response = await fetch(`projectApi/requirements/${requirementId}`);
+        const response = await fetch(projectApi(`/requirements/${requirementId}`));
         const requirement = await response.json();
         
         document.getElementById('requirementId').value = requirement.id;
@@ -602,8 +602,8 @@ async function saveRequirement() {
     
     try {
         const url = requirementId 
-            ? `${API_BASE}/requirements/${requirementId}`
-            : `${API_BASE}/requirements`;
+            ? projectApi(`/requirements/${requirementId}`)
+            : projectApi('/requirements');
         
         const method = requirementId ? 'PUT' : 'POST';
         
@@ -640,7 +640,7 @@ async function deleteRequirement(requirementId) {
     }
     
     try {
-        const response = await fetch(`projectApi/requirements/${requirementId}`, {
+        const response = await fetch(projectApi(`/requirements/${requirementId}`), {
             method: 'DELETE'
         });
         
@@ -664,7 +664,7 @@ async function openLinkModal(sourceRequirementId) {
     
     // Загрузка списка требований для выбора цели
     try {
-        const response = await fetch(`projectApi/requirements`);
+        const response = await fetch(projectApi('/requirements'));
         const requirements = await response.json();
         
         targetSelect.innerHTML = '<option value="">Выберите требование</option>';
@@ -693,7 +693,7 @@ async function saveLink() {
     };
     
     try {
-        const response = await fetch(`projectApi/links`, {
+        const response = await fetch(projectApi('/links'), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -717,7 +717,7 @@ async function saveLink() {
 // Просмотр истории изменений
 async function viewHistory(requirementId) {
     try {
-        const response = await fetch(`projectApi/requirements/${requirementId}/history`);
+        const response = await fetch(projectApi(`/requirements/${requirementId}/history`));
         const history = await response.json();
         
         const modal = document.getElementById('historyModal');
@@ -768,12 +768,12 @@ async function viewHistory(requirementId) {
 
 // Экспорт в Excel
 function exportToExcel() {
-    window.location.href = `${API_BASE}/export`;
+    window.location.href = projectApi('/export');
 }
 
 // Экспорт матрицы в Excel
 function exportMatrixToExcel() {
-    window.location.href = `${API_BASE}/export/matrix`;
+    window.location.href = projectApi('/export/matrix');
 }
 
 // Вспомогательные функции
