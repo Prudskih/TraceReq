@@ -7,7 +7,7 @@ from flask import Blueprint, request, jsonify, send_file
 from database import db
 from models.project import Project
 from models.requirement import Requirement, RequirementType, RequirementStatus, Priority
-from models.link import LinkType
+from models.link import Link, LinkType
 from services.export_service import ExportService
 
 import logic
@@ -60,6 +60,12 @@ def delete_project(project_id):
     if not project:
         return jsonify({'error': 'Project not found'}), 404
 
+    req_ids = db.session.query(Requirement.id).filter(Requirement.project_id == project_id)
+    db.session.query(Link).filter(
+        (Link.source_requirement_id.in_(req_ids))
+        | (Link.target_requirement_id.in_(req_ids))
+    ).delete(synchronize_session=False)
+    db.session.query(Requirement).filter(Requirement.project_id == project_id).delete(synchronize_session=False)
     db.session.delete(project)
     db.session.commit()
     return jsonify({'message': 'Project deleted successfully'})
