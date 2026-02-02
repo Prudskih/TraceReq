@@ -21,8 +21,8 @@ class ExportService:
             "author",
         ])
 
-        for r in requirements:
-            d = r.to_dict()
+        for req in requirements:
+            d = req.to_dict()
             ws_req.append([
                 d.get("id"),
                 d.get("title"),
@@ -37,12 +37,12 @@ class ExportService:
         ws_links = wb.create_sheet("Links")
         ws_links.append(["id", "source_id", "target_id", "link_type"])
 
-        for l in links:
+        for link in links:
             ws_links.append([
-                getattr(l, "id", None),
-                l.source_requirement_id,
-                l.target_requirement_id,
-                l.link_type.value,
+                getattr(link, "id", None),
+                link.source_requirement_id,
+                link.target_requirement_id,
+                link.link_type.value,
             ])
 
         wb.save(file_path)

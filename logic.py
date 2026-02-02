@@ -23,34 +23,39 @@ def _save_history(requirement_id, change_type, old_values, new_values, who):
     db.session.commit()
 
 
-def get_requirement_with_links(requirement_id):
+def get_requirement_with_links(project_id,requirement_id):
     """Требование + входящие/исходящие связи."""
     req = db.session.get(Requirement, requirement_id)
-    if not req:
+    if not req or req.project_id != project_id:
         return None
 
-    outgoing = db.session.query(Link).filter_by(source_requirement_id=requirement_id).all()
-    incoming = db.session.query(Link).filter_by(target_requirement_id=requirement_id).all()
+    outgoing = (((db.session.query(Link)
+                .join(Requirement, Link.target_requirement_id == Requirement.id))
+                .filter(Link.source_requirement_id == requirement_id))
+                .all())
+    incoming = ((db.session.query(Link)
+                .join(Requirement, Link.sourse_requirement_id == Requirement.id)
+                .filter(Link.target_requirement_id == Requirement.id))
+                .all())
 
     d = req.to_dict()
-    d['outgoing_links'] = [l.to_dict() for l in outgoing]
-    d['incoming_links'] = [l.to_dict() for l in incoming]
+    d['outgoing_links'] = [link.to_dict() for link in outgoing]
+    d['incoming_links'] = [link.to_dict() for link in incoming]
     return d
 
 
-def get_all_requirements_with_links():
+def get_all_requirements_with_links(project_id):
     """Все требования со связями"""
-    reqs = db.session.query(Requirement).order_by(Requirement.id.asc()).all()
-    result = []
-    for r in reqs:
-        d = get_requirement_with_links(r.id)
-        if d:
-            result.append(d)
-    return result
+    reqs = (db.session.query(Requirement)
+            .filter(Requirement.project_id == project_id)
+            .order_by(Requirement.id.ask())
+            .all())
+    return [get_requirement_with_links(project_id, req.id) for req in reqs if req]
 
 
-def create_requirement(requirement_data, author=None):
+def create_requirement(project_id: int, requirement_data: dict, author=None):
     """Создание требования."""
+    requirement_data['project_id'] = project_id
     if author:
         requirement_data['author'] = author
 
@@ -62,10 +67,10 @@ def create_requirement(requirement_data, author=None):
     return req
 
 
-def update_requirement(requirement_id, fields, changed_by=None):
+def update_requirement(project_id:int,requirement_id:int, fields, changed_by=None):
     """Обновление требования."""
     req = db.session.get(Requirement, requirement_id)
-    if not req:
+    if not req or req.project_id != project_id:
         return None
 
     old_values = req.to_dict()
@@ -78,10 +83,10 @@ def update_requirement(requirement_id, fields, changed_by=None):
     return req
 
 
-def delete_requirement(requirement_id, deleted_by=None):
+def delete_requirement(project_id:int,requirement_id:int, deleted_by=None):
     """Удаление требования."""
     req = db.session.get(Requirement, requirement_id)
-    if not req:
+    if not req or req.project_id != project_id:
         return False
 
     old_values = req.to_dict()
@@ -98,7 +103,7 @@ def delete_requirement(requirement_id, deleted_by=None):
     return True
 
 
-def create_link(source_id, target_id, link_type):
+def create_link(project_id:int, source_id:int, target_id:int, link_type):
     """Создание связи между требованиями."""
     if source_id == target_id:
         return None
@@ -106,6 +111,8 @@ def create_link(source_id, target_id, link_type):
     src = db.session.get(Requirement, source_id)
     tgt = db.session.get(Requirement, target_id)
     if not src or not tgt:
+        return None
+    if src.project_id != project_id or tgt.project_id != project_id:
         return None
 
     link = Link(
@@ -139,10 +146,19 @@ def get_history(requirement_id):
     )
 
 
-def build_matrix():
+def build_matrix(project_id: int):
     """Матрица пересечений: source -> target -> тип связи."""
-    reqs = db.session.query(Requirement).order_by(Requirement.id.asc()).all()
-    links = db.session.query(Link).all()
+    reqs = (db.session.query(Requirement)
+            .filter(Requirement.project_id == project_id)
+            .order_by(Requirement.id.ask())
+            .all())
+
+    req_ids = [req.id for req in reqs]
+
+    links = (db.session.query(Link)
+             .filter(Link.source_requirement_id == Requirement.id)
+             .filter(Link.target_requirement_id.in_(req_ids))
+             .all())
 
     matrix = {}
     for l in links:

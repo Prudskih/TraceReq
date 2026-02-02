@@ -1,6 +1,12 @@
-// Главный JavaScript файл для работы с требованиями
+ // Главный JavaScript файл для работы с требованиями
 
 const API_BASE = '/api';
+
+function projectApi(path) {
+  const pid = window.CURRENT_PROJECT_ID;
+  return `${API_BASE}/projects/${pid}${path}`;
+}
+
 let allRequirements = [];
 let currentView = 'grid';
 let mindMapNetwork = null;
@@ -10,6 +16,7 @@ document.addEventListener('DOMContentLoaded', function() {
     loadRequirements();
     setupEventListeners();
 });
+
 
 // Настройка обработчиков событий
 function setupEventListeners() {
@@ -113,7 +120,7 @@ function switchView(viewName) {
 // Загрузка всех требований
 async function loadRequirements() {
     try {
-        const response = await fetch(`${API_BASE}/requirements`);
+        const response = await fetch(projectApi('/requirements'));
         allRequirements = await response.json();
         if (currentView === 'grid') {
             displayRequirements(allRequirements);
@@ -247,7 +254,7 @@ function getPriorityClass(priority) {
 // Просмотр деталей требования
 async function viewRequirementDetail(requirementId) {
     try {
-        const response = await fetch(`${API_BASE}/requirements/${requirementId}`);
+        const response = await fetch(`projectApi/requirements/${requirementId}`);
         const requirement = await response.json();
         
         const modal = document.getElementById('detailModal');
@@ -343,7 +350,7 @@ function showRequirementDescription(requirementId) {
     const requirement = allRequirements.find(r => r.id === requirementId);
     if (!requirement) {
         // Если требование не найдено в кэше, загружаем его
-        fetch(`${API_BASE}/requirements/${requirementId}`)
+        fetch(`projectApi/requirements/${requirementId}`)
             .then(response => response.json())
             .then(req => {
                 showDescriptionModal(req);
@@ -384,7 +391,7 @@ function showDescriptionModal(requirement) {
 // Отображение таблицы пересечений
 async function displayMatrix() {
     try {
-        const response = await fetch(`${API_BASE}/matrix`);
+        const response = await fetch(`projectApi/matrix`);
         const data = await response.json();
         
         const container = document.getElementById('matrixTable');
@@ -563,7 +570,7 @@ function openRequirementModal(requirementId = null) {
 // Загрузка требования для редактирования
 async function loadRequirementForEdit(requirementId) {
     try {
-        const response = await fetch(`${API_BASE}/requirements/${requirementId}`);
+        const response = await fetch(`projectApi/requirements/${requirementId}`);
         const requirement = await response.json();
         
         document.getElementById('requirementId').value = requirement.id;
@@ -633,7 +640,7 @@ async function deleteRequirement(requirementId) {
     }
     
     try {
-        const response = await fetch(`${API_BASE}/requirements/${requirementId}`, {
+        const response = await fetch(`projectApi/requirements/${requirementId}`, {
             method: 'DELETE'
         });
         
@@ -657,7 +664,7 @@ async function openLinkModal(sourceRequirementId) {
     
     // Загрузка списка требований для выбора цели
     try {
-        const response = await fetch(`${API_BASE}/requirements`);
+        const response = await fetch(`projectApi/requirements`);
         const requirements = await response.json();
         
         targetSelect.innerHTML = '<option value="">Выберите требование</option>';
@@ -686,7 +693,7 @@ async function saveLink() {
     };
     
     try {
-        const response = await fetch(`${API_BASE}/links`, {
+        const response = await fetch(`projectApi/links`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -710,7 +717,7 @@ async function saveLink() {
 // Просмотр истории изменений
 async function viewHistory(requirementId) {
     try {
-        const response = await fetch(`${API_BASE}/requirements/${requirementId}/history`);
+        const response = await fetch(`projectApi/requirements/${requirementId}/history`);
         const history = await response.json();
         
         const modal = document.getElementById('historyModal');

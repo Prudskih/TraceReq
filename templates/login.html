@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Проекты — трассировка требований</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+
+  <!-- Специальные стили ТОЛЬКО для модалки проектов (уникальные классы!) -->
+  <style>
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      width: 100%;
+    }
+
+    /* Уникальные классы, чтобы НЕ конфликтовать с .modal из style.css */
+    .project-modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.35);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      z-index: 5000;
+    }
+
+    .project-modal {
+      background: #fff;
+      width: min(640px, 100%);
+      border-radius: 14px;
+      box-shadow: 0 10px 40px rgba(0,0,0,.25);
+      overflow: hidden;
+    }
+
+    .project-modal-header {
+      padding: 14px 16px;
+      border-bottom: 1px solid #eee;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-weight: 700;
+    }
+
+    .project-modal-body { padding: 16px; }
+
+    .project-modal-footer {
+      padding: 14px 16px;
+      border-top: 1px solid #eee;
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+
+    .field input,
+    .field textarea {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #ddd;
+      border-radius: 10px;
+      font: inherit;
+      background: #fff;
+    }
+
+    .muted { color: #7f8c8d; }
+
+    .actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+      flex-wrap: wrap;
+    }
+
+    .error-text {
+      color: #c0392b;
+      margin-top: 8px;
+    }
+
+    /* Немного красивее кнопки на карточках */
+    .btn.btn-small {
+      padding: 8px 12px;
+      font-size: 13px;
+      border-radius: 8px;
+    }
+
+    /* Чтобы header из style.css не “резал” подзаголовок */
+    header { gap: 12px; }
+    header > div:first-child { display:flex; flex-direction:column; gap:6px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="topbar">
+        <div>
+          <h1 style="margin:0;">Система трассировки требований</h1>
+          <div class="muted">Выберите проект или создайте новый</div>
+        </div>
+
+        <button class="btn btn-primary" id="btnCreate" type="button">+ Создать проект</button>
+      </div>
+    </header>
+
+    <div class="grid-container">
+      <div id="projectsGrid" class="requirements-grid"></div>
+    </div>
+
+    <!-- Модалка проекта -->
+    <div class="project-modal-backdrop" id="modalBackdrop" aria-hidden="true">
+      <div class="project-modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+        <div class="project-modal-header">
+          <div id="modalTitle">Проект</div>
+          <button class="btn btn-secondary btn-small" id="btnCloseModal" type="button">Закрыть</button>
+        </div>
+
+        <div class="project-modal-body">
+          <div class="field">
+            <label for="projectName">Наименование</label>
+            <input id="projectName" type="text" maxlength="200" placeholder="Например: Требования мобильного приложения" />
+          </div>
+
+          <div class="field">
+            <label for="projectDesc">Описание</label>
+            <textarea id="projectDesc" rows="4" placeholder="Краткое описание проекта"></textarea>
+          </div>
+
+          <div class="error-text" id="modalError" style="display:none;"></div>
+        </div>
+
+        <div class="project-modal-footer">
+          <button class="btn btn-secondary" id="btnCancel" type="button">Отмена</button>
+          <button class="btn btn-primary" id="btnSave" type="button">Сохранить</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- JS подключаем в конце body, чтобы все элементы уже существовали -->
+<script defer src="{{ url_for('static', filename='js/projects.js') }}"></script>
+</body>
+</html>

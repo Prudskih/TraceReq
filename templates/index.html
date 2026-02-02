@@ -11,6 +11,7 @@
     <div class="container">
         <header>
             <h1>Система трассировки требований</h1>
+            <p style="color:#7f8c8d;">Проект: <b>{{ project.name }}</b></p>
             <div class="header-actions">
                 <button id="addRequirementBtn" class="btn btn-primary">Добавить требование</button>
                 <div class="view-switcher">
@@ -174,7 +175,9 @@
             </div>
         </div>
     </div>
-
+    <script>
+        window.CURRENT_PROJECT_ID = {{ project.id }};
+    </script>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
 </html>

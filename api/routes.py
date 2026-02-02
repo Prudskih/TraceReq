@@ -4,6 +4,8 @@ import tempfile
 
 from flask import Blueprint, request, jsonify, send_file
 
+from database import db
+from models.project import Project
 from models.requirement import RequirementType, RequirementStatus, Priority
 from models.link import LinkType
 from services.export_service import ExportService
@@ -14,23 +16,43 @@ import logic
 api = Blueprint('api', __name__)
 
 
-@api.route('/requirements', methods=['GET'])
-def get_requirements():
+@api.route('/projects', methods=['Post'])
+def create_project():
+    data = request.get_json() or {}
+    name = (data.get('name') or "").strip()
+    description = (data.get('description') or "").strip()
+
+    if not name:
+        return jsonify({'error': 'name required'}), 400
+
+    project = Project(name=name, description=description)
+    db.session.add(project)
+    db.session.commit()
+    return jsonify(project.to_dict()), 201
+
+
+@api.route('/projects', methods=['GET'])
+def get_projects():
+    projects =  Project.query.order_by(Project.id.asc()).all()
+    return jsonify([project.to_dict() for project in projects])
+
+
+@api.route('/project/<int:project_id>/requirements', methods=['GET'])
+def get_requirements(project_id):
     """Все требования со связями."""
-    return jsonify(logic.get_all_requirements_with_links())
+    return jsonify(logic.get_all_requirements_with_links(project_id))
 
 
-@api.route('/requirements/<int:requirement_id>', methods=['GET'])
-def get_requirement(requirement_id):
-    """Одно требование со связями."""
-    req = logic.get_requirement_with_links(requirement_id)
+@api.route('/projects/<int:project_id>/requirements/<int:requirement_id>', methods=['GET'])
+def get_requirement(project_id, requirement_id):
+    req = logic.get_requirement_with_links(project_id, requirement_id)
     if req:
         return jsonify(req)
     return jsonify({'error': 'Requirement not found'}), 404
 
 
 @api.route('/requirements', methods=['POST'])
-def create_requirement():
+def create_requirement(project_id):
     """Создание требования."""
     data = request.json or {}
 
@@ -45,14 +67,14 @@ def create_requirement():
             'author': data.get('author', '')
         }
 
-        req = logic.create_requirement(requirement_data, author=data.get('author'))
+        req = logic.create_requirement(project_id, requirement_data, author=data.get('author') )
         return jsonify(req.to_dict()), 201
     except Exception as e:
         return jsonify({'error': str(e)}), 400
 
 
 @api.route('/requirements/<int:requirement_id>', methods=['PUT'])
-def update_requirement(requirement_id):
+def update_requirement(project_id,requirement_id):
     """Обновление требования."""
     data = request.json or {}
 
@@ -74,7 +96,7 @@ def update_requirement(requirement_id):
         if 'author' in data:
             fields['author'] = data['author']
 
-        req = logic.update_requirement(requirement_id, fields, changed_by=data.get('changed_by'))
+        req = logic.update_requirement(project_id, requirement_id, fields, changed_by=data.get('changed_by'))
         if req:
             return jsonify(req.to_dict())
         return jsonify({'error': 'Requirement not found'}), 404
@@ -83,11 +105,11 @@ def update_requirement(requirement_id):
 
 
 @api.route('/requirements/<int:requirement_id>', methods=['DELETE'])
-def delete_requirement(requirement_id):
+def delete_requirement(project_id, requirement_id):
     """Удаление требования."""
     data = request.get_json(silent=True) or {}
 
-    if logic.delete_requirement(requirement_id, deleted_by=data.get('deleted_by')):
+    if logic.delete_requirement(project_id, requirement_id, deleted_by=data.get('deleted_by')):
         return jsonify({'message': 'Requirement deleted successfully'})
 
     return jsonify({'error': 'Requirement not found'}), 404
@@ -101,12 +123,13 @@ def get_requirement_history(requirement_id):
 
 
 @api.route('/links', methods=['POST'])
-def create_link():
+def create_link(project_id):
     """Создание связи между требованиями."""
     data = request.json or {}
 
     try:
         link = logic.create_link(
+            project_id = project_id,
             source_id=data['source_id'],
             target_id=data['target_id'],
             link_type=LinkType(data['link_type'])
@@ -128,16 +151,16 @@ def delete_link(link_id):
 
 
 @api.route('/matrix', methods=['GET'])
-def get_requirements_matrix():
+def get_requirements_matrix(project_id):
     """Матрица пересечений требований."""
-    reqs, matrix, _links = logic.build_matrix()
+    reqs, matrix, _links = logic.build_matrix(project_id)
     return jsonify({'requirements': [r.to_dict() for r in reqs], 'matrix': matrix})
 
 
 @api.route('/export', methods=['GET'])
-def export_to_excel():
+def export_to_excel(project_id):
     """Экспорт требований и связей в Excel."""
-    reqs, _matrix, links = logic.build_matrix()
+    reqs, _matrix, links = logic.build_matrix(project_id)
 
     exporter = ExportService()
 
@@ -155,9 +178,9 @@ def export_to_excel():
 
 
 @api.route('/export/matrix', methods=['GET'])
-def export_matrix_to_excel():
+def export_matrix_to_excel(project_id):
     """Экспорт матрицы пересечений в Excel."""
-    reqs, _matrix, links = logic.build_matrix()
+    reqs, _matrix, links = logic.build_matrix(project_id)
 
     exporter = ExportService()
 

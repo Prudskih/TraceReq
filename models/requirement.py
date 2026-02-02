@@ -1,7 +1,7 @@
 """Модель требования"""
 from datetime import datetime
 from enum import Enum
-from sqlalchemy import Column, Integer, String, Text, DateTime, Enum as SQLEnum
+from sqlalchemy import Column, Integer, String, Text, DateTime, Enum as SQLEnum, ForeignKey
 from sqlalchemy.orm import relationship
 from database import db
 
@@ -37,6 +37,8 @@ class Requirement(db.Model):
     __tablename__ = 'requirements'
     
     id = Column(Integer, primary_key=True)
+    project_id = Column(Integer, ForeignKey('projects.id'), nullable=False, index=True)
+    project = relationship("Project", back_populates="requirements")
     title = Column(String(500), nullable=False)
     description = Column(Text)
     requirement_type = Column(SQLEnum(RequirementType), nullable=False)
@@ -71,6 +73,7 @@ class Requirement(db.Model):
         """Преобразование в словарь для API"""
         return {
             'id': self.id,
+            "project_id": self.project_id,
             'title': self.title,
             'description': self.description or '',
             'requirement_type': self.requirement_type.value,
