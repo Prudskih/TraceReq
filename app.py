@@ -26,7 +26,7 @@ def project_home(project_id: int):
     project = Project.query.get(project_id)
     if not project:
         abort(404)
-    return render_template('project.html', project=project)
+    return render_template('index.html', project=project)
 
 if __name__ == '__main__':
     with app.app_context():

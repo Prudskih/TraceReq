@@ -10,7 +10,7 @@ class Project(db.Model):
     id = Column(db.Integer, primary_key=True)
     name = Column(String(200),nullable=False,unique=True)
     description = Column(String(1000),nullable=False, default='')
-    created_at = Column(DateTime, default=datetime.UTC)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     requirements = relationship(
         'Requirement',

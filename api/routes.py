@@ -16,7 +16,7 @@ import logic
 api = Blueprint('api', __name__)
 
 
-@api.route('/projects', methods=['Post'])
+@api.route('/projects', methods=['POST'])
 def create_project():
     data = request.get_json() or {}
     name = (data.get('name') or "").strip()
@@ -37,7 +37,7 @@ def get_projects():
     return jsonify([project.to_dict() for project in projects])
 
 
-@api.route('/project/<int:project_id>/requirements', methods=['GET'])
+@api.route('/projects/<int:project_id>/requirements', methods=['GET'])
 def get_requirements(project_id):
     """Все требования со связями."""
     return jsonify(logic.get_all_requirements_with_links(project_id))
@@ -51,7 +51,7 @@ def get_requirement(project_id, requirement_id):
     return jsonify({'error': 'Requirement not found'}), 404
 
 
-@api.route('/requirements', methods=['POST'])
+@api.route('/projects/<int:project_id>/requirements', methods=['POST'])
 def create_requirement(project_id):
     """Создание требования."""
     data = request.json or {}

@@ -48,7 +48,7 @@ def get_all_requirements_with_links(project_id):
     """Все требования со связями"""
     reqs = (db.session.query(Requirement)
             .filter(Requirement.project_id == project_id)
-            .order_by(Requirement.id.ask())
+            .order_by(Requirement.id.asc())
             .all())
     return [get_requirement_with_links(project_id, req.id) for req in reqs if req]
 
@@ -157,8 +157,7 @@ def build_matrix(project_id: int):
 
     links = (db.session.query(Link)
              .filter(Link.source_requirement_id == Requirement.id)
-             .filter(Link.target_requirement_id.in_(req_ids))
-             .all())
+             .filter(Link.target_requirement_id.in_(req_ids)).all())
 
     matrix = {}
     for l in links:
