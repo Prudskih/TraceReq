@@ -150,14 +150,15 @@ def build_matrix(project_id: int):
     """Матрица пересечений: source -> target -> тип связи."""
     reqs = (db.session.query(Requirement)
             .filter(Requirement.project_id == project_id)
-            .order_by(Requirement.id.ask())
+            .order_by(Requirement.id.asc())
             .all())
 
     req_ids = [req.id for req in reqs]
 
     links = (db.session.query(Link)
-             .filter(Link.source_requirement_id == Requirement.id)
-             .filter(Link.target_requirement_id.in_(req_ids)).all())
+             .filter(Link.source_requirement_id.in_(req_ids))
+             .filter(Link.target_requirement_id.in_(req_ids))
+             .all())
 
     matrix = {}
     for l in links:
