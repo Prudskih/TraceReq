@@ -68,6 +68,23 @@ function setupEventListeners() {
         e.preventDefault();
         saveRequirement();
     });
+
+    // Фильтры требований
+    ['filterType', 'filterStatus', 'filterPriority'].forEach(filterId => {
+        const filter = document.getElementById(filterId);
+        if (filter) {
+            filter.addEventListener('change', function() {
+                applyFilters();
+            });
+        }
+    });
+
+    const resetFiltersBtn = document.getElementById('resetFiltersBtn');
+    if (resetFiltersBtn) {
+        resetFiltersBtn.addEventListener('click', function() {
+            resetFilters();
+        });
+    }
     
     // Обработка формы связи
     document.getElementById('linkForm').addEventListener('submit', function(e) {
@@ -107,7 +124,7 @@ function switchView(viewName) {
     
     if (viewName === 'grid') {
         document.getElementById('gridView').classList.add('active');
-        displayRequirements(allRequirements);
+        applyFilters();
     } else if (viewName === 'matrix') {
         document.getElementById('matrixView').classList.add('active');
         displayMatrix();
@@ -123,7 +140,7 @@ async function loadRequirements() {
         const response = await fetch(projectApi('/requirements'));
         allRequirements = await response.json();
         if (currentView === 'grid') {
-            displayRequirements(allRequirements);
+            applyFilters();
         } else if (currentView === 'matrix') {
             displayMatrix();
         } else if (currentView === 'mindmap') {
@@ -136,12 +153,12 @@ async function loadRequirements() {
 }
 
 // Отображение требований в сетке
-function displayRequirements(requirements) {
+function displayRequirements(requirements, emptyMessage = 'Нет требований. Добавьте первое требование.') {
     const grid = document.getElementById('requirementsGrid');
     grid.innerHTML = '';
     
     if (requirements.length === 0) {
-        grid.innerHTML = '<p style="text-align: center; color: #7f8c8d; padding: 40px;">Нет требований. Добавьте первое требование.</p>';
+        grid.innerHTML = `<p style="text-align: center; color: #7f8c8d; padding: 40px;">${emptyMessage}</p>`;
         return;
     }
     
@@ -149,6 +166,38 @@ function displayRequirements(requirements) {
         const card = createRequirementCard(requirement);
         grid.appendChild(card);
     });
+}
+
+function getFilterValues() {
+    return {
+        type: document.getElementById('filterType')?.value || '',
+        status: document.getElementById('filterStatus')?.value || '',
+        priority: document.getElementById('filterPriority')?.value || ''
+    };
+}
+
+function applyFilters() {
+    const { type, status, priority } = getFilterValues();
+    const filteredRequirements = allRequirements.filter(req => {
+        const matchesType = !type || req.requirement_type === type;
+        const matchesStatus = !status || req.status === status;
+        const matchesPriority = !priority || req.priority === priority;
+        return matchesType && matchesStatus && matchesPriority;
+    });
+
+    displayRequirements(filteredRequirements, 'Нет требований по выбранным фильтрам.');
+}
+
+function resetFilters() {
+    const filterType = document.getElementById('filterType');
+    const filterStatus = document.getElementById('filterStatus');
+    const filterPriority = document.getElementById('filterPriority');
+
+    if (filterType) filterType.value = '';
+    if (filterStatus) filterStatus.value = '';
+    if (filterPriority) filterPriority.value = '';
+
+    applyFilters();
 }
 
 // Создание карточки требования
