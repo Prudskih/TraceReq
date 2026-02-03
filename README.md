@@ -1,5 +1,2 @@
 ## Запуск
-1. python -m venv venv
-2. venv\Scripts\activate
-3. pip install -r requirements.txt
-4. python app.py
+1. В командной строке ввести команду: python run_app.py

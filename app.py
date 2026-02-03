@@ -58,4 +58,4 @@ if __name__ == '__main__':
         db.create_all()
         ensure_project_id_column()
 
-    app.run(debug=True)
+    app.run(debug=False)
