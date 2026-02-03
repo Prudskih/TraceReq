@@ -1,11 +1,10 @@
-"""Репозиторий для работы с требованиями"""
 from typing import List, Optional
 from sqlalchemy.orm import Session
 from models.requirement import Requirement, RequirementType
 
 
 class RequirementRepository:
-    """Репозиторий для работы с требованиями (Single Responsibility Principle)"""
+    """Репозиторий для работы с требованиями"""
     
     def __init__(self, db_session: Session):
         self.db = db_session

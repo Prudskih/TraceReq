@@ -8,7 +8,7 @@ class ExportService:
         """Экспорт списка требований и связей в один .xlsx."""
         wb = Workbook()
 
-        # --- Лист 1: требования ---
+        #Лист 1: требования
         ws_req = wb.active
         ws_req.title = "Requirements"
         ws_req.append([
@@ -33,7 +33,7 @@ class ExportService:
                 d.get("author"),
             ])
 
-        # --- Лист 2: связи ---
+        #Лист 2: связи
         ws_links = wb.create_sheet("Links")
         ws_links.append(["id", "source_id", "target_id", "link_type"])
 

@@ -1,4 +1,3 @@
-"""Репозиторий для работы со связями между требованиями"""
 from typing import List, Optional
 from sqlalchemy.orm import Session
 from models.link import Link, LinkType
