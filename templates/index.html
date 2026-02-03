@@ -29,6 +29,41 @@
         <!-- Представление сетки -->
         <div id="gridView" class="view-container active">
             <div class="grid-container">
+                <div class="filters-bar">
+                    <div class="filter-group">
+                        <label for="filterType">Тип требований</label>
+                        <select id="filterType">
+                            <option value="">Все типы</option>
+                            <option value="Бизнес-требование">Бизнес-требование</option>
+                            <option value="Функциональное требование">Функциональное требование</option>
+                            <option value="Нефункциональное требование">Нефункциональное требование</option>
+                            <option value="Пользовательское требование">Пользовательское требование</option>
+                            <option value="Требование к интерфейсу">Требование к интерфейсу</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label for="filterStatus">Статус</label>
+                        <select id="filterStatus">
+                            <option value="">Все статусы</option>
+                            <option value="Черновик">Черновик</option>
+                            <option value="В работе">В работе</option>
+                            <option value="На проверке">На проверке</option>
+                            <option value="Утверждено">Утверждено</option>
+                            <option value="Отклонено">Отклонено</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label for="filterPriority">Приоритет</label>
+                        <select id="filterPriority">
+                            <option value="">Все приоритеты</option>
+                            <option value="Низкий">Низкий</option>
+                            <option value="Средний">Средний</option>
+                            <option value="Высокий">Высокий</option>
+                            <option value="Критический">Критический</option>
+                        </select>
+                    </div>
+                    <button id="resetFiltersBtn" class="btn btn-secondary btn-small">Сбросить фильтры</button>
+                </div>
                 <div id="requirementsGrid" class="requirements-grid">
                     <!-- Сетка требований будет загружена через JavaScript -->
                 </div>

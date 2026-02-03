@@ -117,6 +117,38 @@ header h1 {
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
+.filters-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: flex-end;
+    padding: 12px;
+    background: #f8f9fa;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+.filter-group {
+    min-width: 200px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.filter-group label {
+    font-size: 12px;
+    font-weight: bold;
+    color: #2c3e50;
+}
+
+.filter-group select {
+    padding: 8px 10px;
+    border-radius: 6px;
+    border: 1px solid #dcdcdc;
+    font-size: 13px;
+}
+
 .requirements-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
@@ -578,6 +610,15 @@ header h1 {
 
 /* Адаптивность */
 @media (max-width: 768px) {
+    .filters-bar {
+        align-items: stretch;
+    }
+
+    .filter-group {
+        width: 100%;
+        min-width: unset;
+    }
+
     .requirements-grid {
         grid-template-columns: 1fr;
     }
