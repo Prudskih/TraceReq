@@ -88,7 +88,31 @@ class DocxImportService:
                 if numbered[1]:
                     drafts.append(self._make_draft(numbered[0], numbered[1], current_type))
                 continue
-        #Обработку иерархий  дописать
+                bullet_text = self._parse_bullet_text(paragraph)
+                if not bullet_text:
+                    continue
+
+                explicit_number = NUMBER_IN_TEXT_RE.search(bullet_text)
+                if explicit_number:
+                    number = explicit_number.group("number")
+                    body = normalize_text(bullet_text.replace(number, "", 1).strip(" .:-"), lower=False)
+                    if body:
+                        drafts.append(self._make_draft(number, body, current_type))
+                        child_index = self._sync_child_index(current_parent, number, child_index)
+                    continue
+
+                if current_parent:
+                    child_index += 1
+                    drafts.append(self._make_draft(f"{current_parent}.{child_index}", bullet_text, current_type))
+
+            if not drafts:
+                self._logger.warning("Не найдено требований для импорта")
+                raise ValueError(
+                    "Не найдено требований для импорта. Используйте заголовки с типом требований, пункты 4.1/4.1.1 и маркированные подпункты."
+                )
+
+            self._logger.info("Импортировано требований: %s", len(drafts))
+            return drafts
 
         self._logger.info("Импортировано требований: %s", len(drafts))
         return drafts
@@ -111,9 +135,32 @@ class DocxImportService:
             return None
         return match.group("number"), normalize_text(match.group("body"), lower=False)
 
-
     @staticmethod
     def _make_draft(number: str, body: str, requirement_type: str) -> RequirementDraft:
         title = normalize_text(f"{number} {body}", lower=False)
         return RequirementDraft(title=title, requirement_type=requirement_type)
+
+    @staticmethod
+    def _sync_child_index(parent, number: str, current_index: int) -> int:
+        if not parent or not number.startswith(f"{parent}."):
+            return current_index
+        suffix = number[len(parent) + 1:]
+        if suffix.isdigit():
+            return max(current_index, int(suffix))
+        return current_index
+
+    @staticmethod
+    def _parse_bullet_text(paragraph: DocxParagraph):
+        style = normalize_text(paragraph.style_name)
+        text = normalize_text(paragraph.text, lower=False)
+        if not text:
+            return None
+
+        is_bullet_style = any(marker in style for marker in BULLET_STYLE_MARKERS)
+        match = BULLET_PREFIX_RE.match(text)
+        if not is_bullet_style and not match:
+            return None
+
+        cleaned = match.group(1) if match else text
+        return normalize_text(cleaned, lower=False)
 

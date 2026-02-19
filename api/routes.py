@@ -8,6 +8,7 @@ from database import db
 from models.project import Project
 from models.requirement import Requirement, RequirementType, RequirementStatus, Priority
 from models.link import Link, LinkType
+from services.docx_import_service import DocxImportService
 from services.export_service import ExportService
 
 import logic
@@ -108,7 +109,7 @@ def import_requirements_from_docx(project_id):
         return jsonify({'error': 'Project not found'}), 404
 
     aliases = current_app.config.get("REQUIREMENT_TYPE_ALIASES")
-    parser = ... #Сервис импорта прописать логику
+    parser = DocxImportService(aliases=aliases)
 
     try:
         parsed_requirements = parser.parse(file_bytes)

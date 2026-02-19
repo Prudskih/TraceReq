@@ -33,6 +33,22 @@ function setupEventListeners() {
     document.getElementById('exportMatrixBtn').addEventListener('click', function() {
         exportMatrixToExcel();
     });
+
+    const importDocxBtn = document.getElementById('importDocxBtn');
+    const importDocxInput = document.getElementById('importDocxInput');
+
+    if (importDocxBtn && importDocxInput) {
+        importDocxBtn.addEventListener('click', function() {
+            importDocxInput.click();
+        });
+
+        importDocxInput.addEventListener('change', function(event) {
+            const [file] = event.target.files || [];
+            if (!file) return;
+            importRequirementsFromDocx(file);
+            importDocxInput.value = '';
+        });
+    }
     
     // Переключение представлений
     document.getElementById('gridViewBtn').addEventListener('click', function() {
