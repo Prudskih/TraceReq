@@ -12,6 +12,7 @@ BULLET_STYLE_MARKERS = ("list bullet", "маркирован")
 BULLET_PREFIX_RE = re.compile(r"^[\-•*–—]\s*(.+)$")
 NUMBERED_POINT_RE = re.compile(r"^(?P<number>\d+(?:\.\d+)+)[\.)]?\s*(?P<body>.*)$")
 NUMBER_IN_TEXT_RE = re.compile(r"(?P<number>\d+(?:\.\d+)+)")
+HEADING_PREFIX_RE = re.compile(r"^\d+(?:\.\d+)*[\.)]?\s*(?P<body>.+)$")
 
 
 @dataclass(frozen=True)
@@ -75,7 +76,7 @@ class DocxImportService:
 
         for paragraph in paragraphs:
             resolved_heading_type = self._resolve_requirement_type(paragraph.text)
-            if self._is_heading(paragraph.style_name) and resolved_heading_type:
+            if resolved_heading_type:
                 current_type = resolved_heading_type
                 current_parent = None
                 child_index = 0
@@ -127,7 +128,16 @@ class DocxImportService:
         return HEADING_MARKER in normalize_text(style_name)
 
     def _resolve_requirement_type(self, heading_text: str):
-        return self._aliases.get(normalize_text(heading_text))
+        normalized_heading = normalize_text(heading_text)
+        direct_match = self._aliases.get(normalized_heading)
+        if direct_match:
+            return direct_match
+
+        match = HEADING_PREFIX_RE.match(normalize_text(heading_text, lower=False))
+        if not match:
+            return None
+
+        return self._aliases.get(normalize_text(match.group("body")))
 
     @staticmethod
     def _parse_numbered(text: str):
