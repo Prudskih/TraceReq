@@ -1,10 +1,11 @@
-
 from dataclasses import dataclass
 from io import BytesIO
 import logging
 import re
-from services.text_normalizer import normalize_text
+
 from docx import Document
+
+from services.text_normalizer import normalize_text
 
 HEADING_MARKER = "heading"
 BULLET_STYLE_MARKERS = ("list bullet", "маркирован")
@@ -32,10 +33,11 @@ class RequirementDraft:
             "requirement_type": self.requirement_type,
         }
 
+
 class DocxReader:
     """Слой чтения абзацев из .docx."""
 
-    def __init__(self, logger = None):
+    def __init__(self, logger=None):
         self._logger = logger or logging.getLogger(__name__)
 
     def read_paragraphs(self, file_bytes: bytes):
@@ -56,24 +58,25 @@ class DocxReader:
 
 
 class DocxImportService:
-    """Ипорта требований из .docx."""
+    """Импорт требований из .docx."""
 
-    def __init__(self, aliases = None, reader = None, logger = None):
+    def __init__(self, aliases=None, reader=None, logger=None):
         self._logger = logger or logging.getLogger(__name__)
         self._aliases = self._normalize_aliases(aliases or {})
         self._reader = reader or DocxReader(logger=self._logger)
 
     def parse(self, file_bytes: bytes):
         paragraphs = self._reader.read_paragraphs(file_bytes)
-        drafts= []
+        drafts = []
 
         current_type = None
-        current_parent= None
+        current_parent = None
         child_index = 0
 
         for paragraph in paragraphs:
-            if self._is_heading(paragraph.style_name):
-                current_type = self._resolve_requirement_type(paragraph.text)
+            resolved_heading_type = self._resolve_requirement_type(paragraph.text)
+            if self._is_heading(paragraph.style_name) and resolved_heading_type:
+                current_type = resolved_heading_type
                 current_parent = None
                 child_index = 0
                 continue
@@ -88,31 +91,29 @@ class DocxImportService:
                 if numbered[1]:
                     drafts.append(self._make_draft(numbered[0], numbered[1], current_type))
                 continue
-                bullet_text = self._parse_bullet_text(paragraph)
-                if not bullet_text:
-                    continue
 
-                explicit_number = NUMBER_IN_TEXT_RE.search(bullet_text)
-                if explicit_number:
-                    number = explicit_number.group("number")
-                    body = normalize_text(bullet_text.replace(number, "", 1).strip(" .:-"), lower=False)
-                    if body:
-                        drafts.append(self._make_draft(number, body, current_type))
-                        child_index = self._sync_child_index(current_parent, number, child_index)
-                    continue
+            bullet_text = self._parse_bullet_text(paragraph)
+            if not bullet_text:
+                continue
 
-                if current_parent:
-                    child_index += 1
-                    drafts.append(self._make_draft(f"{current_parent}.{child_index}", bullet_text, current_type))
+            explicit_number = NUMBER_IN_TEXT_RE.search(bullet_text)
+            if explicit_number:
+                number = explicit_number.group("number")
+                body = normalize_text(bullet_text.replace(number, "", 1).strip(" .:-"), lower=False)
+                if body:
+                    drafts.append(self._make_draft(number, body, current_type))
+                    child_index = self._sync_child_index(current_parent, number, child_index)
+                continue
 
-            if not drafts:
-                self._logger.warning("Не найдено требований для импорта")
-                raise ValueError(
-                    "Не найдено требований для импорта. Используйте заголовки с типом требований, пункты 4.1/4.1.1 и маркированные подпункты."
-                )
+            if current_parent:
+                child_index += 1
+                drafts.append(self._make_draft(f"{current_parent}.{child_index}", bullet_text, current_type))
 
-            self._logger.info("Импортировано требований: %s", len(drafts))
-            return drafts
+        if not drafts:
+            self._logger.warning("Не найдено требований для импорта")
+            raise ValueError(
+                "Не найдено требований для импорта. Используйте заголовки с типом требований, пункты 4.1/4.1.1 и маркированные подпункты."
+            )
 
         self._logger.info("Импортировано требований: %s", len(drafts))
         return drafts
@@ -163,4 +164,3 @@ class DocxImportService:
 
         cleaned = match.group(1) if match else text
         return normalize_text(cleaned, lower=False)
-
