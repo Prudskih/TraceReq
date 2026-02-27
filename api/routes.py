@@ -1,148 +1,285 @@
-from dataclasses import dataclass
-from io import BytesIO
-import logging
-import re
+"""API маршруты"""
 
-from docx import Document
+import tempfile
 
-from services.text_normalizer import normalize_text
+from flask import Blueprint, request, jsonify, send_file, current_app
 
-BULLET_STYLE_MARKERS = ("list bullet", "маркирован", "bullet")
-NUMBERED_STYLE_MARKERS = ("list number", "нумер", "numbered")
+from database import db
+from models.project import Project
+from models.requirement import Requirement, RequirementType, RequirementStatus, Priority
+from models.link import Link, LinkType
+from services.docx_import_service import DocxImportService
+from services.export_service import ExportService
 
-BULLET_PREFIX_RE = re.compile(r"^[\-•*–—]\s*(.+)$")
-NUMBERED_POINT_RE = re.compile(r"^\d+(?:\.\d+)*[\.)]?\s+.+$")
-GROUP_HEADING_RE = re.compile(r"^<\s*(?P<body>[^<>]+?)\s*>$")
-END_MARKER = "end"
+import logic
 
 
-@dataclass(frozen=True)
-class DocxParagraph:
-    text: str
-    style_name: str
-    is_list_item: bool
+api = Blueprint('api', __name__)
 
 
-@dataclass(frozen=True)
-class RequirementDraft:
-    title: str
-    requirement_type: str
-    description: str = ""
+@api.route('/projects', methods=['POST'])
+def create_project():
+    data = request.get_json() or {}
+    name = (data.get('name') or "").strip()
+    description = (data.get('description') or "").strip()
 
-    def to_dict(self):
-        return {
-            "title": self.title,
-            "description": self.description,
-            "requirement_type": self.requirement_type,
+    if not name:
+        return jsonify({'error': 'name required'}), 400
+
+    project = Project(name=name, description=description)
+    db.session.add(project)
+    db.session.commit()
+    return jsonify(project.to_dict()), 201
+
+
+@api.route('/projects', methods=['GET'])
+def get_projects():
+    projects =  Project.query.order_by(Project.id.asc()).all()
+    return jsonify([project.to_dict() for project in projects])
+
+
+@api.route('/projects/<int:project_id>', methods=['PUT'])
+def update_project(project_id):
+    data = request.get_json() or {}
+    project = Project.query.get(project_id)
+    if not project:
+        return jsonify({'error': 'Project not found'}), 404
+
+    name = (data.get('name') or "").strip()
+    description = (data.get('description') or "").strip()
+
+    if name:
+        project.name = name
+    project.description = description
+    db.session.commit()
+    return jsonify(project.to_dict())
+
+
+@api.route('/projects/<int:project_id>', methods=['DELETE'])
+def delete_project(project_id):
+    project = Project.query.get(project_id)
+    if not project:
+        return jsonify({'error': 'Project not found'}), 404
+
+    req_ids = db.session.query(Requirement.id).filter(Requirement.project_id == project_id)
+    db.session.query(Link).filter(
+        (Link.source_requirement_id.in_(req_ids))
+        | (Link.target_requirement_id.in_(req_ids))
+    ).delete(synchronize_session=False)
+    db.session.query(Requirement).filter(Requirement.project_id == project_id).delete(synchronize_session=False)
+    db.session.delete(project)
+    db.session.commit()
+    return jsonify({'message': 'Project deleted successfully'})
+
+
+@api.route('/projects/<int:project_id>/requirements', methods=['GET'])
+def get_requirements(project_id):
+    """Все требования со связями."""
+    return jsonify(logic.get_all_requirements_with_links(project_id))
+
+
+@api.route('/projects/<int:project_id>/requirements/<int:requirement_id>', methods=['GET'])
+def get_requirement(project_id, requirement_id):
+    req = logic.get_requirement_with_links(project_id, requirement_id)
+    if req:
+        return jsonify(req)
+    return jsonify({'error': 'Requirement not found'}), 404
+
+@api.route('/projects/<int:project_id>/requirements/import/docx', methods=['POST'])
+def import_requirements_from_docx(project_id):
+    """Импорт требований из .docx файла."""
+    uploaded_file = request.files.get('file')
+
+    if not uploaded_file:
+        return jsonify({'error': 'Требуется файл'}), 400
+
+    filename = (uploaded_file.filename or '').strip()
+    if not filename:
+        return jsonify({'error': 'Имя файла не задано'}), 400
+
+    if not filename.lower().endswith('.docx'):
+        return jsonify({'error': 'Поддерживается только формат .docx'}), 400
+
+    file_bytes = uploaded_file.read()
+    if not file_bytes:
+        return jsonify({'error': 'Файл пустой'}), 400
+
+    project = Project.query.get(project_id)
+    if not project:
+        return jsonify({'error': 'Project not found'}), 404
+
+    aliases = current_app.config.get("REQUIREMENT_TYPE_ALIASES")
+    parser = DocxImportService(aliases=aliases)
+
+    try:
+        parsed_requirements = parser.parse(file_bytes)
+
+        created = []
+        for parsed_requirement in parsed_requirements:
+            payload = parsed_requirement.to_dict()
+            requirement_data = {
+                'title': payload['title'],
+                'description': payload['description'],
+                'requirement_type': RequirementType(payload['requirement_type']),
+            }
+            req = logic.create_requirement(
+                project_id,
+                requirement_data,
+            )
+            created.append(req.to_dict())
+
+        return jsonify({'created_count': len(created), 'requirements': created}), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 400
+
+
+
+
+@api.route('/projects/<int:project_id>/requirements', methods=['POST'])
+def create_requirement(project_id):
+    """Создание требования."""
+    data = request.json or {}
+
+    try:
+        requirement_data = {
+            'title': data.get('title'),
+            'description': data.get('description', ''),
+            'requirement_type': RequirementType(data.get('requirement_type')),
+            'status': RequirementStatus(data.get('status', 'Черновик')),
+            'priority': Priority(data.get('priority', 'Средний')),
+            'source': data.get('source', ''),
+            'author': data.get('author', '')
         }
 
-
-class DocxReader:
-    """Слой чтения абзацев из .docx."""
-
-    def __init__(self, logger=None):
-        self._logger = logger or logging.getLogger(__name__)
-
-    def read_paragraphs(self, file_bytes: bytes):
-        try:
-            document = Document(BytesIO(file_bytes))
-        except Exception as exc:
-            self._logger.exception("Ошибка чтения .docx")
-            raise ValueError("Некорректный .docx файл") from exc
-
-        paragraphs = []
-        for paragraph in document.paragraphs:
-            text = normalize_text(paragraph.text, lower=False)
-            if not text:
-                continue
-            style_name = paragraph.style.name if paragraph.style else ""
-            paragraphs.append(
-                DocxParagraph(
-                    text=text,
-                    style_name=style_name,
-                    is_list_item=self._is_list_item(paragraph, text, style_name),
-                )
-            )
-        return paragraphs
-
-    @staticmethod
-    def _is_list_item(paragraph, text: str, style_name: str) -> bool:
-        style = normalize_text(style_name)
-        if any(marker in style for marker in (*BULLET_STYLE_MARKERS, *NUMBERED_STYLE_MARKERS)):
-            return True
-
-        p_pr = paragraph._p.pPr  # pylint: disable=protected-access
-        if p_pr is not None and p_pr.numPr is not None:
-            return True
-
-        if BULLET_PREFIX_RE.match(text):
-            return True
-        return bool(NUMBERED_POINT_RE.match(text))
+        req = logic.create_requirement(project_id, requirement_data, author=data.get('author') )
+        return jsonify(req.to_dict()), 201
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
 
 
-class DocxImportService:
-    """Импорт требований из .docx по секциям формата <...> и пунктам списков."""
+@api.route('/projects/<int:project_id>/requirements/<int:requirement_id>', methods=['PUT'])
+def update_requirement(project_id, requirement_id):
+    """Обновление требования."""
+    data = request.json or {}
 
-    def __init__(self, aliases=None, reader=None, logger=None):
-        self._logger = logger or logging.getLogger(__name__)
-        self._aliases = self._normalize_aliases(aliases or {})
-        self._reader = reader or DocxReader(logger=self._logger)
+    try:
+        fields = {}
 
-    def parse(self, file_bytes: bytes):
-        paragraphs = self._reader.read_paragraphs(file_bytes)
-        drafts = []
+        if 'title' in data:
+            fields['title'] = data['title']
+        if 'description' in data:
+            fields['description'] = data['description']
+        if 'requirement_type' in data:
+            fields['requirement_type'] = RequirementType(data['requirement_type'])
+        if 'status' in data:
+            fields['status'] = RequirementStatus(data['status'])
+        if 'priority' in data:
+            fields['priority'] = Priority(data['priority'])
+        if 'source' in data:
+            fields['source'] = data['source']
+        if 'author' in data:
+            fields['author'] = data['author']
 
-        current_type = None
-        index_by_type: dict[str, int] = {}
+        req = logic.update_requirement(project_id, requirement_id, fields, changed_by=data.get('changed_by'))
+        if req:
+            return jsonify(req.to_dict())
+        return jsonify({'error': 'Requirement not found'}), 404
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
 
-        for p in paragraphs:
-            marker = self._resolve_group_marker(p)
-            if marker == END_MARKER:
-                current_type = None
-                continue
-            if marker:
-                current_type = marker
-                index_by_type.setdefault(current_type, 0)
-                continue
 
-            if not current_type or not p.is_list_item:
-                continue
+@api.route('/projects/<int:project_id>/requirements/<int:requirement_id>', methods=['DELETE'])
+def delete_requirement(project_id, requirement_id):
+    """Удаление требования."""
+    data = request.get_json(silent=True) or {}
 
-            text = normalize_text(p.text, lower=False)
-            if not text:
-                continue
+    if logic.delete_requirement(project_id, requirement_id, deleted_by=data.get('deleted_by')):
+        return jsonify({'message': 'Requirement deleted successfully'})
 
-            index_by_type[current_type] += 1
-            drafts.append(self._make_draft(index_by_type[current_type], text, current_type))
+    return jsonify({'error': 'Requirement not found'}), 404
 
-        if not drafts:
-            self._logger.warning("Не найдено требований для импорта")
-            raise ValueError("Не найдено требований для импорта. Используйте секции в формате <...> и списки.")
 
-        self._logger.info("Импортировано требований: %s", len(drafts))
-        return drafts
+@api.route('/projects/<int:project_id>/requirements/<int:requirement_id>/history', methods=['GET'])
+def get_requirement_history(project_id, requirement_id):
+    """История изменения требования."""
+    req = db.session.get(Requirement, requirement_id)
+    if not req or req.project_id != project_id:
+        return jsonify({'error': 'Requirement not found'}), 404
+    history = logic.get_history(requirement_id)
+    return jsonify([h.to_dict() for h in history])
 
-    @staticmethod
-    def _normalize_aliases(aliases):
-        normalized = {normalize_text(k): v for k, v in aliases.items() if normalize_text(k) and v}
-        normalized.update({normalize_text(v): v for v in aliases.values() if normalize_text(v)})
-        return normalized
 
-    def _resolve_group_marker(self, paragraph: DocxParagraph):
-        raw = normalize_text(paragraph.text, lower=False)
-        if not raw:
-            return None
+@api.route('/projects/<int:project_id>/links', methods=['POST'])
+def create_link(project_id):
+    """Создание связи между требованиями."""
+    data = request.json or {}
 
-        group_match = GROUP_HEADING_RE.match(raw)
-        if not group_match:
-            return None
+    try:
+        link = logic.create_link(
+            project_id = project_id,
+            source_id=data['source_id'],
+            target_id=data['target_id'],
+            link_type=LinkType(data['link_type'])
+        )
 
-        marker_value = normalize_text(group_match.group("body"))
-        if marker_value == END_MARKER:
-            return END_MARKER
-        return self._aliases.get(marker_value)
+        if link:
+            return jsonify(link.to_dict()), 201
+        return jsonify({'error': 'Invalid link data'}), 400
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
 
-    @staticmethod
-    def _make_draft(index: int, body: str, requirement_type: str) -> RequirementDraft:
-        title = normalize_text(f"{requirement_type} {index}", lower=False)
-        return RequirementDraft(title=title, requirement_type=requirement_type, description=body)
+
+@api.route('/links/<int:link_id>', methods=['DELETE'])
+def delete_link(link_id):
+    """Удаление связи."""
+    if logic.delete_link(link_id):
+        return jsonify({'message': 'Link deleted successfully'})
+    return jsonify({'error': 'Link not found'}), 404
+
+
+@api.route('/projects/<int:project_id>/matrix', methods=['GET'])
+def get_requirements_matrix(project_id):
+    """Матрица пересечений требований."""
+    reqs, matrix, _links = logic.build_matrix(project_id)
+    return jsonify({'requirements': [r.to_dict() for r in reqs], 'matrix': matrix})
+
+
+@api.route('/projects/<int:project_id>/export', methods=['GET'])
+def export_to_excel(project_id):
+    """Экспорт требований и связей в Excel."""
+    reqs, _matrix, links = logic.build_matrix(project_id)
+
+    exporter = ExportService()
+
+    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx')
+    temp_file.close()
+
+    exporter.export_to_excel(reqs, links, temp_file.name)
+
+    return send_file(
+        temp_file.name,
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        as_attachment=True,
+        download_name='requirements_trace.xlsx'
+    )
+
+
+@api.route('/projects/<int:project_id>/export/matrix', methods=['GET'])
+def export_matrix_to_excel(project_id):
+    """Экспорт матрицы пересечений в Excel."""
+    reqs, _matrix, links = logic.build_matrix(project_id)
+
+    exporter = ExportService()
+
+    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx')
+    temp_file.close()
+
+    exporter.export_matrix_to_excel(reqs, links, temp_file.name)
+
+    return send_file(
+        temp_file.name,
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        as_attachment=True,
+        download_name='requirements_matrix.xlsx'
+    )
