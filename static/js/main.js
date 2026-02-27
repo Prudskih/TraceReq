@@ -33,6 +33,22 @@ function setupEventListeners() {
     document.getElementById('exportMatrixBtn').addEventListener('click', function() {
         exportMatrixToExcel();
     });
+
+    const importDocxBtn = document.getElementById('importDocxBtn');
+    const importDocxInput = document.getElementById('importDocxInput');
+
+    if (importDocxBtn && importDocxInput) {
+        importDocxBtn.addEventListener('click', function() {
+            importDocxInput.click();
+        });
+
+        importDocxInput.addEventListener('change', function(event) {
+            const [file] = event.target.files || [];
+            if (!file) return;
+            importRequirementsFromDocx(file);
+            importDocxInput.value = '';
+        });
+    }
     
     // Переключение представлений
     document.getElementById('gridViewBtn').addEventListener('click', function() {
@@ -818,6 +834,37 @@ async function viewHistory(requirementId) {
 // Экспорт в Excel
 function exportToExcel() {
     window.location.href = projectApi('/export');
+}
+
+// Импорт требований из DOCX
+async function importRequirementsFromDocx(file) {
+    if (!file.name.toLowerCase().endsWith('.docx')) {
+        alert('Поддерживается только формат .docx');
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+        const response = await fetch(projectApi('/requirements/import/docx'), {
+            method: 'POST',
+            body: formData
+        });
+
+        const payload = await response.json();
+
+        if (!response.ok) {
+            alert('Ошибка импорта: ' + (payload.error || 'Неизвестная ошибка'));
+            return;
+        }
+
+        loadRequirements();
+        alert(`Импорт завершен. Добавлено требований: ${payload.created_count || 0}`);
+    } catch (error) {
+        console.error('Ошибка импорта DOCX:', error);
+        alert('Ошибка импорта DOCX');
+    }
 }
 
 // Экспорт матрицы в Excel

@@ -2,12 +2,13 @@
 
 import tempfile
 
-from flask import Blueprint, request, jsonify, send_file
+from flask import Blueprint, request, jsonify, send_file, current_app
 
 from database import db
 from models.project import Project
 from models.requirement import Requirement, RequirementType, RequirementStatus, Priority
 from models.link import Link, LinkType
+from services.docx_import_service import DocxImportService
 from services.export_service import ExportService
 
 import logic
@@ -83,6 +84,56 @@ def get_requirement(project_id, requirement_id):
     if req:
         return jsonify(req)
     return jsonify({'error': 'Requirement not found'}), 404
+
+@api.route('/projects/<int:project_id>/requirements/import/docx', methods=['POST'])
+def import_requirements_from_docx(project_id):
+    """Импорт требований из .docx файла."""
+    uploaded_file = request.files.get('file')
+
+    if not uploaded_file:
+        return jsonify({'error': 'Требуется файл'}), 400
+
+    filename = (uploaded_file.filename or '').strip()
+    if not filename:
+        return jsonify({'error': 'Имя файла не задано'}), 400
+
+    if not filename.lower().endswith('.docx'):
+        return jsonify({'error': 'Поддерживается только формат .docx'}), 400
+
+    file_bytes = uploaded_file.read()
+    if not file_bytes:
+        return jsonify({'error': 'Файл пустой'}), 400
+
+    project = Project.query.get(project_id)
+    if not project:
+        return jsonify({'error': 'Project not found'}), 404
+
+    aliases = current_app.config.get("REQUIREMENT_TYPE_ALIASES")
+    parser = DocxImportService(aliases=aliases)
+
+    try:
+        parsed_requirements = parser.parse(file_bytes)
+
+        created = []
+        for parsed_requirement in parsed_requirements:
+            payload = parsed_requirement.to_dict()
+            requirement_data = {
+                'title': payload['title'],
+                'description': payload['description'],
+                'requirement_type': RequirementType(payload['requirement_type']),
+            }
+            req = logic.create_requirement(
+                project_id,
+                requirement_data,
+            )
+            created.append(req.to_dict())
+
+        return jsonify({'created_count': len(created), 'requirements': created}), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 400
+
+
 
 
 @api.route('/projects/<int:project_id>/requirements', methods=['POST'])
