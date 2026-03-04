@@ -35,6 +35,7 @@ def ensure_project_id_column():
 
     db.session.execute(
         text("UPDATE requirements SET project_id = :project_id WHERE project_id IS NULL"),
+
         {"project_id": project.id},
     )
     db.session.commit()

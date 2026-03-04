@@ -846,6 +846,10 @@ async function importRequirementsFromDocx(file) {
     const formData = new FormData();
     formData.append('file', file);
 
+       const importModeSelect = document.getElementById('importModeSelect');
+    const mode = importModeSelect ? importModeSelect.value : 'append';
+    formData.append('mode', mode);
+
     try {
         const response = await fetch(projectApi('/requirements/import/docx'), {
             method: 'POST',
@@ -860,6 +864,15 @@ async function importRequirementsFromDocx(file) {
         }
 
         loadRequirements();
+
+        if (payload.mode === 'sync') {
+            alert(
+                `Синхронизация завершена. Добавлено: ${payload.created_count || 0}, ` +
+                `обновлено: ${payload.updated_count || 0}, удалено: ${payload.deleted_count || 0}`
+            );
+            return;
+        }
+
         alert(`Импорт завершен. Добавлено требований: ${payload.created_count || 0}`);
     } catch (error) {
         console.error('Ошибка импорта DOCX:', error);

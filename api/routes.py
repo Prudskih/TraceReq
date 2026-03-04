@@ -111,8 +111,30 @@ def import_requirements_from_docx(project_id):
     aliases = current_app.config.get("REQUIREMENT_TYPE_ALIASES")
     parser = DocxImportService(aliases=aliases)
 
+    sync_mode = (request.form.get('mode') or 'append').strip().lower()
+    changed_by = (request.form.get('changed_by') or '').strip() or None
+
+    if sync_mode not in {'append', 'sync'}:
+        return jsonify({'error': 'Недопустимый режим импорта. Используйте append или sync'}), 400
+
     try:
         parsed_requirements = parser.parse(file_bytes)
+
+        if sync_mode == 'sync':
+            result = logic.sync_requirements_from_docx(
+                project_id=project_id,
+                parsed_requirements=parsed_requirements,
+                changed_by=changed_by,
+            )
+            return jsonify({
+                'mode': 'sync',
+                'created_count': len(result['created']),
+                'updated_count': len(result['updated']),
+                'deleted_count': len(result['deleted_ids']),
+                'created': [req.to_dict() for req in result['created']],
+                'updated': [req.to_dict() for req in result['updated']],
+                'deleted_ids': result['deleted_ids'],
+            }), 200
 
         created = []
         for parsed_requirement in parsed_requirements:
@@ -126,9 +148,14 @@ def import_requirements_from_docx(project_id):
                 project_id,
                 requirement_data,
             )
+            req = logic.create_requirement(project_id, requirement_data, author=changed_by)
             created.append(req.to_dict())
 
-        return jsonify({'created_count': len(created), 'requirements': created}), 201
+        return jsonify({
+            'mode': 'append',
+            'created_count': len(created),
+            'requirements': created,
+        }), 201
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 400

@@ -66,6 +66,79 @@ def create_requirement(project_id: int, requirement_data: dict, author=None):
     _save_history(req.id, 'CREATE', None, req.to_dict(), author)
     return req
 
+def sync_requirements_from_docx(project_id: int, parsed_requirements, changed_by=None):
+    """Синхронизация требований проекта с DOCX по типу и порядковому номеру."""
+    existing_requirements = (
+        db.session.query(Requirement)
+        .filter(Requirement.project_id == project_id)
+        .filter(Requirement.source == 'DOCX')
+        .order_by(Requirement.id.asc())
+        .all()
+    )
+
+    existing_by_type = {}
+    for req in existing_requirements:
+        existing_by_type.setdefault(req.requirement_type.value, []).append(req)
+
+    incoming_by_type = {}
+    for parsed_requirement in parsed_requirements:
+        payload = parsed_requirement.to_dict()
+        incoming_by_type.setdefault(payload['requirement_type'], []).append(payload)
+
+    created = []
+    updated = []
+    deleted = []
+
+    all_types = set(existing_by_type) | set(incoming_by_type)
+    for requirement_type in all_types:
+        existing_items = existing_by_type.get(requirement_type, [])
+        incoming_items = incoming_by_type.get(requirement_type, [])
+
+        common_len = min(len(existing_items), len(incoming_items))
+
+        # Обновляем существующие требования по порядковому номеру внутри типа.
+        for index in range(common_len):
+            existing = existing_items[index]
+            incoming = incoming_items[index]
+
+            fields = {}
+            if existing.title != incoming['title']:
+                fields['title'] = incoming['title']
+            if existing.description != incoming['description']:
+                fields['description'] = incoming['description']
+            if existing.requirement_type.value != incoming['requirement_type']:
+                fields['requirement_type'] = incoming['requirement_type']
+            if existing.source != 'DOCX':
+                fields['source'] = 'DOCX'
+
+            if fields:
+                req = update_requirement(project_id, existing.id, fields, changed_by=changed_by)
+                if req:
+                    updated.append(req)
+
+        # Создаём недостающие требования.
+        for incoming in incoming_items[common_len:]:
+            req = create_requirement(project_id, {
+                'title': incoming['title'],
+                'description': incoming['description'],
+                'requirement_type': incoming['requirement_type'],
+                'source': 'DOCX',
+            }, author=changed_by)
+            created.append(req)
+
+        # Удаляем лишние требования, которых больше нет в DOCX.
+        for req in existing_items[common_len:]:
+            if delete_requirement(project_id, req.id, deleted_by=changed_by):
+                deleted.append(req.id)
+
+    return {
+        'created': created,
+        'updated': updated,
+        'deleted_ids': deleted,
+    }
+
+
+
 
 def update_requirement(project_id:int,requirement_id:int, fields, changed_by=None):
     """Обновление требования."""

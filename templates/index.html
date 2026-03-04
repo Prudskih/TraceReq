@@ -20,6 +20,10 @@
                     <button id="mindMapViewBtn" class="btn btn-view">Mind Map</button>
                 </div>
                 <div class="export-actions">
+                    <select id="importModeSelect" class="btn btn-secondary" title="Режим импорта DOCX">
+                        <option value="append">Добавлять к существующим</option>
+                        <option value="sync">Синхронизировать с файлом</option>
+                    </select>
                     <button id="importDocxBtn" class="btn btn-secondary">Импорт из DOCX</button>
                     <input id="importDocxInput" type="file" accept=".docx" style="display:none;">
                     <button id="exportBtn" class="btn btn-secondary">Экспорт в Excel</button>
