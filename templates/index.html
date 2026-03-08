@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="ru">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,6 +8,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
 </head>
+
 <body>
     <div class="container">
         <header>
@@ -96,17 +98,17 @@
             <h2 id="modalTitle">Добавить требование</h2>
             <form id="requirementForm">
                 <input type="hidden" id="requirementId">
-                
+
                 <div class="form-group">
                     <label for="title">Название *</label>
                     <input type="text" id="title" required>
                 </div>
-                
+
                 <div class="form-group">
                     <label for="description">Описание</label>
                     <textarea id="description" rows="4"></textarea>
                 </div>
-                
+
                 <div class="form-group">
                     <label for="requirementType">Тип требования *</label>
                     <select id="requirementType" required>
@@ -117,7 +119,7 @@
                         <option value="Требование к интерфейсу">Требование к интерфейсу</option>
                     </select>
                 </div>
-                
+
                 <div class="form-row">
                     <div class="form-group">
                         <label for="status">Статус</label>
@@ -129,7 +131,7 @@
                             <option value="Отклонено">Отклонено</option>
                         </select>
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="priority">Приоритет</label>
                         <select id="priority">
@@ -140,17 +142,17 @@
                         </select>
                     </div>
                 </div>
-                
+
                 <div class="form-group">
                     <label for="source">Источник</label>
                     <input type="text" id="source">
                 </div>
-                
+
                 <div class="form-group">
                     <label for="author">Автор</label>
                     <input type="text" id="author">
                 </div>
-                
+
                 <div class="form-actions">
                     <button type="submit" class="btn btn-primary">Сохранить</button>
                     <button type="button" class="btn btn-secondary" id="cancelBtn">Отмена</button>
@@ -166,14 +168,14 @@
             <h2>Добавить связь</h2>
             <form id="linkForm">
                 <input type="hidden" id="sourceRequirementId">
-                
+
                 <div class="form-group">
                     <label for="targetRequirementId">Целевое требование</label>
                     <select id="targetRequirementId" required>
                         <!-- Заполнится через JavaScript -->
                     </select>
                 </div>
-                
+
                 <div class="form-group">
                     <label for="linkType">Тип связи</label>
                     <select id="linkType" required>
@@ -182,7 +184,7 @@
                         <option value="Противоречит">Противоречит</option>
                     </select>
                 </div>
-                
+
                 <div class="form-actions">
                     <button type="submit" class="btn btn-primary">Создать связь</button>
                     <button type="button" class="btn btn-secondary" id="cancelLinkBtn">Отмена</button>
@@ -217,4 +219,5 @@
     </script>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
+
 </html>

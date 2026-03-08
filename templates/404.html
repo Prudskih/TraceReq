@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+  <meta charset="UTF-8">
+  <title>404</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+
+<body>
+
+  <div class="page404">
+
+    <div class="error-code">
+
+      <span class="digit">4</span>
+
+      <div class="video-zero">
+        <video id="video" autoplay loop playsinline>
+          <source src="{{ url_for('static', filename='video/404.mp4') }}" type="video/mp4">
+        </video>
+
+        <canvas id="canvas"></canvas>
+      </div>
+
+      <span class="digit">4</span>
+
+    </div>
+
+    <h1 class="title">Страница не найдена</h1>
+
+    <p class="text">
+      Возможно страница была удалена или вы ввели неверный адрес
+    </p>
+
+    <a href="/" class="button">Вернуться на главную</a>
+
+  </div>
+
+  <script src="{{ url_for('static', filename='js/not-found-error.js') }}"></script>
+</body>
+
+</html>

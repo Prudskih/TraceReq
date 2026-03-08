@@ -6,8 +6,13 @@
 
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background-color: #f5f5f5;
     color: #333;
+    margin:0;
+    background:white;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    height:100vh;
 }
 
 .container {
@@ -689,3 +694,58 @@ header h1 {
 }
 
 }
+
+
+.page404{
+  text-align:center;
+}
+
+.error-code{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:30px;
+}
+
+.digit{
+  font-size:160px;
+  font-weight:900;
+  color:#ff7a00;
+}
+
+.video-zero{
+  position:relative;
+  width:160px;
+  height:160px;
+}
+
+#video{
+  display:none;
+}
+
+#canvas{
+  width: 300px;
+    display: flex;
+    position: absolute;
+    top: -170px;
+    left: -60px;
+}
+.title{
+  margin-top:40px;
+  font-size:32px;
+}
+
+.text{
+  color:#666;
+}
+
+.button{
+  display:inline-block;
+  margin-top:30px;
+  padding:14px 30px;
+  background:#ff7a00;
+  color:white;
+  text-decoration:none;
+  border-radius:8px;
+}
+
