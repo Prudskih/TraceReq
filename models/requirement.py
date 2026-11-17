@@ -3,7 +3,7 @@ from datetime import datetime
 from enum import Enum
 from sqlalchemy import Column, Integer, String, Text, DateTime, Enum as SQLEnum, ForeignKey
 from sqlalchemy.orm import relationship
-from database import db
+from database import Base
 
 
 class RequirementType(str, Enum):
@@ -32,7 +32,7 @@ class Priority(str, Enum):
     CRITICAL = "Критический"
 
 
-class Requirement(db.Model):
+class Requirement(Base):
     """Модель требования"""
     __tablename__ = 'requirements'
     

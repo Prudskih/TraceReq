@@ -2,7 +2,7 @@
 from enum import Enum
 from sqlalchemy import Column, Integer, ForeignKey, Enum as SQLEnum
 from sqlalchemy.orm import relationship
-from database import db
+from database import Base
 
 
 class LinkType(str, Enum):
@@ -12,7 +12,7 @@ class LinkType(str, Enum):
     CONTRADICTS = "Противоречит"
 
 
-class Link(db.Model):
+class Link(Base):
     """Модель связи между требованиями"""
     __tablename__ = 'links'
     

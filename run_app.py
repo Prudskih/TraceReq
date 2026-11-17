@@ -1,6 +1,10 @@
 import os
 import subprocess
 import venv
+from pathlib import Path
+
+
+BASE_DIR = Path(__file__).resolve().parent
 
 
 def get_venv_python(venv_dir: str) -> str:
@@ -20,11 +24,14 @@ def ensure_venv(venv_dir: str) -> str:
 
 
 def install_requirements(python_path: str) -> None:
-    subprocess.check_call([python_path, "-m", "pip", "install", "-r", "requirements.txt"])
+    subprocess.check_call(
+        [python_path, "-m", "pip", "install", "-r", str(BASE_DIR / "requirements.txt")],
+        cwd=BASE_DIR,
+    )
 
 
 def run_app(python_path: str) -> None:
-    subprocess.check_call([python_path, "app.py"])
+    subprocess.check_call([python_path, str(BASE_DIR / "app.py")], cwd=BASE_DIR)
 
 
 def main() -> None:
