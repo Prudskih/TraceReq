@@ -23,7 +23,7 @@ wheels/
 .installed.cfg
 *.egg
 
-# Flask
+# Application instance
 instance/
 .webassets-cache
 
@@ -49,3 +49,13 @@ Thumbs.db
 # Environment variables
 .env
 .env.local
+
+# Local tooling
+.venv/
+.ruff_cache/
+.mypy_cache/
+.venv-test/
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml

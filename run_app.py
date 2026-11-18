@@ -1,45 +1,28 @@
+"""Создание окружения, установка пакета и запуск из любого рабочего каталога."""
+
 import os
 import subprocess
+import sys
 import venv
 from pathlib import Path
-
 
 BASE_DIR = Path(__file__).resolve().parent
 
 
-def get_venv_python(venv_dir: str) -> str:
-    if os.name == "nt":
-        return os.path.join(venv_dir, "Scripts", "python.exe")
-    return os.path.join(venv_dir, "bin", "python")
-
-
-def ensure_venv(venv_dir: str) -> str:
-    python_path = get_venv_python(venv_dir)
-    if os.path.exists(python_path):
-        return python_path
-
-    builder = venv.EnvBuilder(with_pip=True)
-    builder.create(venv_dir)
-    return python_path
-
-
-def install_requirements(python_path: str) -> None:
-    subprocess.check_call(
-        [python_path, "-m", "pip", "install", "-r", str(BASE_DIR / "requirements.txt")],
-        cwd=BASE_DIR,
-    )
-
-
-def run_app(python_path: str) -> None:
-    subprocess.check_call([python_path, str(BASE_DIR / "app.py")], cwd=BASE_DIR)
-
-
 def main() -> None:
-    venv_dir = os.path.join(os.path.dirname(__file__), ".venv")
-    python_path = ensure_venv(venv_dir)
-    install_requirements(python_path)
-    run_app(python_path)
+    if sys.version_info < (3, 11):
+        raise SystemExit('TraceReq requires Python 3.11 or newer')
+    environment = BASE_DIR / '.venv'
+    executable = environment / ('Scripts/python.exe' if os.name == 'nt' else 'bin/python')
+    if not executable.is_file():
+        venv.EnvBuilder(with_pip=True).create(environment)
+    subprocess.run(
+        [str(executable), '-m', 'pip', 'install', '-e', str(BASE_DIR)],
+        cwd=BASE_DIR,
+        check=True,
+    )
+    subprocess.run([str(executable), '-m', 'tracereq'], cwd=BASE_DIR, check=True)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
