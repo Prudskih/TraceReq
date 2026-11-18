@@ -1,13 +1,14 @@
 import datetime
+from email.utils import format_datetime
 
-from sqlalchemy import Column, String, DateTime
+from sqlalchemy import Column, Integer, String, DateTime
 from sqlalchemy.orm import relationship
 
-from database import db
+from database import Base
 
-class Project(db.Model):
+class Project(Base):
     __tablename__ = 'projects'
-    id = Column(db.Integer, primary_key=True)
+    id = Column(Integer, primary_key=True)
     name = Column(String(200),nullable=False,unique=True)
     description = Column(String(1000),nullable=False, default='')
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
@@ -23,5 +24,5 @@ class Project(db.Model):
             'id':self.id,
             'name': self.name,
             'description': self.description,
-            'created_at': self.created_at,
+            'created_at': format_datetime(self.created_at.replace(tzinfo=datetime.timezone.utc), usegmt=True) if self.created_at else None,
         }

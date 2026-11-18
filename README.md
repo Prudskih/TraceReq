@@ -1,4 +1,4 @@
-TraceReq - это веб‑приложение на Flask для ведения требований и их трассировки внутри проектов.
+TraceReq - это веб‑приложение на FastAPI для ведения требований и их трассировки внутри проектов.
 Система позволяет:
 
 - создавать и администрировать проекты;
@@ -58,8 +58,8 @@ TraceReq - это веб‑приложение на Flask для ведения
 
 ## 2. Технологический стек
 
-- **Backend**: Python, Flask, Flask Blueprint
-- **ORM и БД**: SQLAlchemy, Flask‑SQLAlchemy, SQLite (по умолчанию)
+- **Backend**: Python 3.10+, FastAPI, Uvicorn, APIRouter
+- **ORM и БД**: SQLAlchemy, SQLite (по умолчанию)
 - **Шаблоны/UI**: Jinja2, HTML/CSS/JS
 - **Работа с файлами**:
   - `python-docx` для импорта
@@ -71,7 +71,7 @@ TraceReq - это веб‑приложение на Flask для ведения
 
 ```text
 TraceReq/
-├── app.py                    # Точка входа Flask-приложения
+├── app.py                    # Точка входа FastAPI-приложения
 ├── run_app.py                # Скрипт автозапуска (venv + зависимости + app)
 ├── config.py                 # Конфигурация приложения
 ├── database.py               # Инициализация SQLAlchemy
@@ -207,9 +207,10 @@ TraceReq/
 
 Поддерживаются переменные окружения:
 
-- `SECRET_KEY` — секрет Flask (по умолчанию `dev-secret-key`)
 - `DATABASE_URL` — строка подключения SQLAlchemy
   - по умолчанию: `sqlite:///requirements_trace.db`
+  - относительные пути SQLite разрешаются относительно папки `instance/` рядом с `app.py`, как и прежде;
+  - существующая база по умолчанию: `instance/requirements_trace.db`.
 
 Дополнительно в `config.py` задается словарь `REQUIREMENT_TYPE_ALIASES` для импорта.
 
@@ -233,3 +234,16 @@ source .venv/bin/activate      # Linux/macOS
 pip install -r requirements.txt
 python app.py
 ```
+
+Приложение доступно по адресу `http://127.0.0.1:5000`, документация API —
+`http://127.0.0.1:5000/docs` (Swagger UI) и `/redoc`, схема — `/openapi.json`.
+
+Также можно запускать ASGI-приложение напрямую:
+
+```bash
+python -m uvicorn app:app --host 127.0.0.1 --port 5000
+```
+
+Запуск использует существующую базу данных с актуальной схемой. Приложение
+не создаёт таблицы и не изменяет схему автоматически; прежнее автоматическое
+добавление `project_id` при старте удалено. Данные и определения таблиц сохранены.

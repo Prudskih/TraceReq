@@ -1,10 +1,10 @@
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, JSON
 from sqlalchemy.orm import relationship
-from database import db
+from database import Base
 
 
-class RequirementHistory(db.Model):
+class RequirementHistory(Base):
     """Модель истории изменений требования"""
     __tablename__ = 'requirement_history'
     

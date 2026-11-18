@@ -1,10 +1,16 @@
 """API маршруты"""
 
 import tempfile
+from pathlib import Path
+from typing import Optional
 
-from flask import Blueprint, request, jsonify, send_file, current_app
+from fastapi import APIRouter, Body, Depends, File, UploadFile
+from fastapi.responses import FileResponse, JSONResponse
+from sqlalchemy.orm import Session
+from starlette.background import BackgroundTask
 
-from database import db
+from config import Config
+from database import get_db
 from models.project import Project
 from models.requirement import Requirement, RequirementType, RequirementStatus, Priority
 from models.link import Link, LinkType
@@ -14,36 +20,36 @@ from services.export_service import ExportService
 import logic
 
 
-api = Blueprint('api', __name__)
+api = APIRouter()
 
 
-@api.route('/projects', methods=['POST'])
-def create_project():
-    data = request.get_json() or {}
+@api.post('/projects', status_code=201)
+def create_project(session: Session = Depends(get_db), data: Optional[dict] = Body(default=None)):
+    data = data or {}
     name = (data.get('name') or "").strip()
     description = (data.get('description') or "").strip()
 
     if not name:
-        return jsonify({'error': 'name required'}), 400
+        return JSONResponse(content={'error': 'name required'}, status_code=400)
 
     project = Project(name=name, description=description)
-    db.session.add(project)
-    db.session.commit()
-    return jsonify(project.to_dict()), 201
+    session.add(project)
+    session.commit()
+    return JSONResponse(content=project.to_dict(), status_code=201)
 
 
-@api.route('/projects', methods=['GET'])
-def get_projects():
-    projects =  Project.query.order_by(Project.id.asc()).all()
-    return jsonify([project.to_dict() for project in projects])
+@api.get('/projects')
+def get_projects(session: Session = Depends(get_db)):
+    projects = session.query(Project).order_by(Project.id.asc()).all()
+    return [project.to_dict() for project in projects]
 
 
-@api.route('/projects/<int:project_id>', methods=['PUT'])
-def update_project(project_id):
-    data = request.get_json() or {}
-    project = Project.query.get(project_id)
+@api.put('/projects/{project_id}')
+def update_project(project_id: int, session: Session = Depends(get_db), data: Optional[dict] = Body(default=None)):
+    data = data or {}
+    project = session.get(Project, project_id)
     if not project:
-        return jsonify({'error': 'Project not found'}), 404
+        return JSONResponse(content={'error': 'Project not found'}, status_code=404)
 
     name = (data.get('name') or "").strip()
     description = (data.get('description') or "").strip()
@@ -51,64 +57,64 @@ def update_project(project_id):
     if name:
         project.name = name
     project.description = description
-    db.session.commit()
-    return jsonify(project.to_dict())
+    session.commit()
+    return project.to_dict()
 
 
-@api.route('/projects/<int:project_id>', methods=['DELETE'])
-def delete_project(project_id):
-    project = Project.query.get(project_id)
+@api.delete('/projects/{project_id}')
+def delete_project(project_id: int, session: Session = Depends(get_db)):
+    project = session.get(Project, project_id)
     if not project:
-        return jsonify({'error': 'Project not found'}), 404
+        return JSONResponse(content={'error': 'Project not found'}, status_code=404)
 
-    req_ids = db.session.query(Requirement.id).filter(Requirement.project_id == project_id)
-    db.session.query(Link).filter(
+    req_ids = session.query(Requirement.id).filter(Requirement.project_id == project_id)
+    session.query(Link).filter(
         (Link.source_requirement_id.in_(req_ids))
         | (Link.target_requirement_id.in_(req_ids))
     ).delete(synchronize_session=False)
-    db.session.query(Requirement).filter(Requirement.project_id == project_id).delete(synchronize_session=False)
-    db.session.delete(project)
-    db.session.commit()
-    return jsonify({'message': 'Project deleted successfully'})
+    session.query(Requirement).filter(Requirement.project_id == project_id).delete(synchronize_session=False)
+    session.delete(project)
+    session.commit()
+    return {'message': 'Project deleted successfully'}
 
 
-@api.route('/projects/<int:project_id>/requirements', methods=['GET'])
-def get_requirements(project_id):
+@api.get('/projects/{project_id}/requirements')
+def get_requirements(project_id: int, session: Session = Depends(get_db)):
     """Все требования со связями."""
-    return jsonify(logic.get_all_requirements_with_links(project_id))
+    return logic.get_all_requirements_with_links(session, project_id)
 
 
-@api.route('/projects/<int:project_id>/requirements/<int:requirement_id>', methods=['GET'])
-def get_requirement(project_id, requirement_id):
-    req = logic.get_requirement_with_links(project_id, requirement_id)
+@api.get('/projects/{project_id}/requirements/{requirement_id}')
+def get_requirement(project_id: int, requirement_id: int, session: Session = Depends(get_db)):
+    req = logic.get_requirement_with_links(session, project_id, requirement_id)
     if req:
-        return jsonify(req)
-    return jsonify({'error': 'Requirement not found'}), 404
+        return req
+    return JSONResponse(content={'error': 'Requirement not found'}, status_code=404)
 
-@api.route('/projects/<int:project_id>/requirements/import/docx', methods=['POST'])
-def import_requirements_from_docx(project_id):
+@api.post('/projects/{project_id}/requirements/import/docx', status_code=201)
+def import_requirements_from_docx(project_id: int, session: Session = Depends(get_db), file: Optional[UploadFile] = File(default=None)):
     """Импорт требований из .docx файла."""
-    uploaded_file = request.files.get('file')
+    uploaded_file = file
 
     if not uploaded_file:
-        return jsonify({'error': 'Требуется файл'}), 400
+        return JSONResponse(content={'error': 'Требуется файл'}, status_code=400)
 
     filename = (uploaded_file.filename or '').strip()
     if not filename:
-        return jsonify({'error': 'Имя файла не задано'}), 400
+        return JSONResponse(content={'error': 'Имя файла не задано'}, status_code=400)
 
     if not filename.lower().endswith('.docx'):
-        return jsonify({'error': 'Поддерживается только формат .docx'}), 400
+        return JSONResponse(content={'error': 'Поддерживается только формат .docx'}, status_code=400)
 
-    file_bytes = uploaded_file.read()
+    file_bytes = uploaded_file.file.read()
     if not file_bytes:
-        return jsonify({'error': 'Файл пустой'}), 400
+        return JSONResponse(content={'error': 'Файл пустой'}, status_code=400)
 
-    project = Project.query.get(project_id)
+    project = session.get(Project, project_id)
     if not project:
-        return jsonify({'error': 'Project not found'}), 404
+        return JSONResponse(content={'error': 'Project not found'}, status_code=404)
 
-    aliases = current_app.config.get("REQUIREMENT_TYPE_ALIASES")
+    aliases = Config.REQUIREMENT_TYPE_ALIASES
     parser = DocxImportService(aliases=aliases)
 
     try:
@@ -123,23 +129,24 @@ def import_requirements_from_docx(project_id):
                 'requirement_type': RequirementType(payload['requirement_type']),
             }
             req = logic.create_requirement(
+                session,
                 project_id,
                 requirement_data,
             )
             created.append(req.to_dict())
 
-        return jsonify({'created_count': len(created), 'requirements': created}), 201
+        return JSONResponse(content={'created_count': len(created), 'requirements': created}, status_code=201)
     except Exception as e:
-        db.session.rollback()
-        return jsonify({'error': str(e)}), 400
+        session.rollback()
+        return JSONResponse(content={'error': str(e)}, status_code=400)
 
 
 
 
-@api.route('/projects/<int:project_id>/requirements', methods=['POST'])
-def create_requirement(project_id):
+@api.post('/projects/{project_id}/requirements', status_code=201)
+def create_requirement(project_id: int, session: Session = Depends(get_db), data: Optional[dict] = Body(default=None)):
     """Создание требования."""
-    data = request.json or {}
+    data = data or {}
 
     try:
         requirement_data = {
@@ -152,16 +159,17 @@ def create_requirement(project_id):
             'author': data.get('author', '')
         }
 
-        req = logic.create_requirement(project_id, requirement_data, author=data.get('author') )
-        return jsonify(req.to_dict()), 201
+        req = logic.create_requirement(session, project_id, requirement_data, author=data.get('author'))
+        return JSONResponse(content=req.to_dict(), status_code=201)
     except Exception as e:
-        return jsonify({'error': str(e)}), 400
+        session.rollback()
+        return JSONResponse(content={'error': str(e)}, status_code=400)
 
 
-@api.route('/projects/<int:project_id>/requirements/<int:requirement_id>', methods=['PUT'])
-def update_requirement(project_id, requirement_id):
+@api.put('/projects/{project_id}/requirements/{requirement_id}')
+def update_requirement(project_id: int, requirement_id: int, session: Session = Depends(get_db), data: Optional[dict] = Body(default=None)):
     """Обновление требования."""
-    data = request.json or {}
+    data = data or {}
 
     try:
         fields = {}
@@ -181,105 +189,116 @@ def update_requirement(project_id, requirement_id):
         if 'author' in data:
             fields['author'] = data['author']
 
-        req = logic.update_requirement(project_id, requirement_id, fields, changed_by=data.get('changed_by'))
+        req = logic.update_requirement(session, project_id, requirement_id, fields, changed_by=data.get('changed_by'))
         if req:
-            return jsonify(req.to_dict())
-        return jsonify({'error': 'Requirement not found'}), 404
+            return req.to_dict()
+        return JSONResponse(content={'error': 'Requirement not found'}, status_code=404)
     except Exception as e:
-        return jsonify({'error': str(e)}), 400
+        session.rollback()
+        return JSONResponse(content={'error': str(e)}, status_code=400)
 
 
-@api.route('/projects/<int:project_id>/requirements/<int:requirement_id>', methods=['DELETE'])
-def delete_requirement(project_id, requirement_id):
+@api.delete('/projects/{project_id}/requirements/{requirement_id}')
+def delete_requirement(project_id: int, requirement_id: int, session: Session = Depends(get_db), data: Optional[dict] = Body(default=None)):
     """Удаление требования."""
-    data = request.get_json(silent=True) or {}
+    data = data or {}
 
-    if logic.delete_requirement(project_id, requirement_id, deleted_by=data.get('deleted_by')):
-        return jsonify({'message': 'Requirement deleted successfully'})
+    if logic.delete_requirement(session, project_id, requirement_id, deleted_by=data.get('deleted_by')):
+        return {'message': 'Requirement deleted successfully'}
 
-    return jsonify({'error': 'Requirement not found'}), 404
+    return JSONResponse(content={'error': 'Requirement not found'}, status_code=404)
 
 
-@api.route('/projects/<int:project_id>/requirements/<int:requirement_id>/history', methods=['GET'])
-def get_requirement_history(project_id, requirement_id):
+@api.get('/projects/{project_id}/requirements/{requirement_id}/history')
+def get_requirement_history(project_id: int, requirement_id: int, session: Session = Depends(get_db)):
     """История изменения требования."""
-    req = db.session.get(Requirement, requirement_id)
+    req = session.get(Requirement, requirement_id)
     if not req or req.project_id != project_id:
-        return jsonify({'error': 'Requirement not found'}), 404
-    history = logic.get_history(requirement_id)
-    return jsonify([h.to_dict() for h in history])
+        return JSONResponse(content={'error': 'Requirement not found'}, status_code=404)
+    history = logic.get_history(session, requirement_id)
+    return [h.to_dict() for h in history]
 
 
-@api.route('/projects/<int:project_id>/links', methods=['POST'])
-def create_link(project_id):
+@api.post('/projects/{project_id}/links', status_code=201)
+def create_link(project_id: int, session: Session = Depends(get_db), data: Optional[dict] = Body(default=None)):
     """Создание связи между требованиями."""
-    data = request.json or {}
+    data = data or {}
 
     try:
         link = logic.create_link(
-            project_id = project_id,
+            session,
+            project_id=project_id,
             source_id=data['source_id'],
             target_id=data['target_id'],
             link_type=LinkType(data['link_type'])
         )
 
         if link:
-            return jsonify(link.to_dict()), 201
-        return jsonify({'error': 'Invalid link data'}), 400
+            return JSONResponse(content=link.to_dict(), status_code=201)
+        return JSONResponse(content={'error': 'Invalid link data'}, status_code=400)
     except Exception as e:
-        return jsonify({'error': str(e)}), 400
+        session.rollback()
+        return JSONResponse(content={'error': str(e)}, status_code=400)
 
 
-@api.route('/links/<int:link_id>', methods=['DELETE'])
-def delete_link(link_id):
+@api.delete('/links/{link_id}')
+def delete_link(link_id: int, session: Session = Depends(get_db)):
     """Удаление связи."""
-    if logic.delete_link(link_id):
-        return jsonify({'message': 'Link deleted successfully'})
-    return jsonify({'error': 'Link not found'}), 404
+    if logic.delete_link(session, link_id):
+        return {'message': 'Link deleted successfully'}
+    return JSONResponse(content={'error': 'Link not found'}, status_code=404)
 
 
-@api.route('/projects/<int:project_id>/matrix', methods=['GET'])
-def get_requirements_matrix(project_id):
+@api.get('/projects/{project_id}/matrix')
+def get_requirements_matrix(project_id: int, session: Session = Depends(get_db)):
     """Матрица пересечений требований."""
-    reqs, matrix, _links = logic.build_matrix(project_id)
-    return jsonify({'requirements': [r.to_dict() for r in reqs], 'matrix': matrix})
+    reqs, matrix, _links = logic.build_matrix(session, project_id)
+    return {'requirements': [r.to_dict() for r in reqs], 'matrix': matrix}
 
 
-@api.route('/projects/<int:project_id>/export', methods=['GET'])
-def export_to_excel(project_id):
+@api.get('/projects/{project_id}/export')
+def export_to_excel(project_id: int, session: Session = Depends(get_db)):
     """Экспорт требований и связей в Excel."""
-    reqs, _matrix, links = logic.build_matrix(project_id)
+    reqs, _matrix, links = logic.build_matrix(session, project_id)
 
     exporter = ExportService()
 
     temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx')
     temp_file.close()
 
-    exporter.export_to_excel(reqs, links, temp_file.name)
+    try:
+        exporter.export_to_excel(reqs, links, temp_file.name)
+    except Exception:
+        Path(temp_file.name).unlink(missing_ok=True)
+        raise
 
-    return send_file(
+    return FileResponse(
         temp_file.name,
-        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        as_attachment=True,
-        download_name='requirements_trace.xlsx'
+        media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        filename='requirements_trace.xlsx',
+        background=BackgroundTask(Path(temp_file.name).unlink, missing_ok=True)
     )
 
 
-@api.route('/projects/<int:project_id>/export/matrix', methods=['GET'])
-def export_matrix_to_excel(project_id):
+@api.get('/projects/{project_id}/export/matrix')
+def export_matrix_to_excel(project_id: int, session: Session = Depends(get_db)):
     """Экспорт матрицы пересечений в Excel."""
-    reqs, _matrix, links = logic.build_matrix(project_id)
+    reqs, _matrix, links = logic.build_matrix(session, project_id)
 
     exporter = ExportService()
 
     temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx')
     temp_file.close()
 
-    exporter.export_matrix_to_excel(reqs, links, temp_file.name)
+    try:
+        exporter.export_matrix_to_excel(reqs, links, temp_file.name)
+    except Exception:
+        Path(temp_file.name).unlink(missing_ok=True)
+        raise
 
-    return send_file(
+    return FileResponse(
         temp_file.name,
-        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        as_attachment=True,
-        download_name='requirements_matrix.xlsx'
+        media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        filename='requirements_matrix.xlsx',
+        background=BackgroundTask(Path(temp_file.name).unlink, missing_ok=True)
     )
